@@ -1,0 +1,27 @@
+{
+  "name": "@arrowmath/arrow-cards",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tiny framework-agnostic place-value arrow cards, rendered as plain SVG.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react.tsx",
+    "./svelte": "./src/svelte/ArrowCard.svelte"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "demo": "vite --open /demo.html"
+  }
+}

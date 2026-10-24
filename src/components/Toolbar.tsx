@@ -8,6 +8,7 @@ import {
   RotateCcw,
   HelpCircle,
   Sparkles,
+  Grid3x3,
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -15,6 +16,8 @@ interface ToolbarProps {
   onThemeChange: (theme: ColorTheme) => void;
   isMuted: boolean;
   onToggleMute: () => void;
+  isGridSnapEnabled: boolean;
+  onToggleGridSnap: () => void;
   onClearCanvas: () => void;
   onAutoSnapAll: () => void;
   onOpenHelp: () => void;
@@ -26,6 +29,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onThemeChange,
   isMuted,
   onToggleMute,
+  isGridSnapEnabled,
+  onToggleGridSnap,
   onClearCanvas,
   onAutoSnapAll,
   onOpenHelp,
@@ -65,8 +70,28 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
       </div>
 
-      {/* Right Controls: Theme, Sound, Reset, Help */}
+      {/* Right Controls: Grid Snap, Theme, Sound, Reset, Help */}
       <div className="flex items-center gap-2">
+        {/* Grid Snap Toggle */}
+        <button
+          type="button"
+          onClick={onToggleGridSnap}
+          title={
+            isGridSnapEnabled
+              ? 'Grid snapping is on — cards line up with the grid'
+              : 'Grid snapping is off — cards can be placed freely'
+          }
+          aria-pressed={isGridSnapEnabled}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
+            isGridSnapEnabled
+              ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+              : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+          }`}
+        >
+          <Grid3x3 className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Grid Snap</span>
+        </button>
+
         {/* Color Theme Dropdown */}
         <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
           <Palette className="w-3.5 h-3.5 text-slate-500" />

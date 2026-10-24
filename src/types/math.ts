@@ -1,4 +1,6 @@
-export type PlaceTier = 'thousands' | 'hundreds' | 'tens' | 'ones';
+import type { PlaceTier } from '../../arrow-cards/src';
+
+export type { ColorTheme, PlaceTier, ThemeColors } from '../../arrow-cards/src';
 
 export interface ArrowCardData {
   id: string;
@@ -20,16 +22,6 @@ export interface CardGroupData {
   zIndex: number;
   isExpanded: boolean; // false = stacked/superimposed, true = horizontal expanded form
   showXRay: boolean; // reveal zeros under top cards
-}
-
-export type ColorTheme = 'curriculum' | 'montessori' | 'pastel' | 'vibrant';
-
-export interface ThemeColors {
-  name: string;
-  thousands: { bg: string; border: string; text: string; fill: string; accent: string };
-  hundreds: { bg: string; border: string; text: string; fill: string; accent: string };
-  tens: { bg: string; border: string; text: string; fill: string; accent: string };
-  ones: { bg: string; border: string; text: string; fill: string; accent: string };
 }
 
 export interface MathChallenge {

@@ -116,6 +116,17 @@ export const PedagogyHelpModal: React.FC<PedagogyHelpModalProps> = ({
               <li className="flex items-start gap-2">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <span>
+                  <strong>Grid Snapping:</strong> Cards settle neatly onto the
+                  workbench grid so they are easy to line up. Use the{' '}
+                  <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-600 font-mono">
+                    Grid Snap
+                  </code>{' '}
+                  button to turn this on or off.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span>
                   <strong>Overlap Snapping:</strong> Drag cards so they physically
                   overlap. Compatible place values snap together cleanly!
                 </span>

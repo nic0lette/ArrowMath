@@ -1,146 +1,41 @@
-import { ArrowCardData, ColorTheme, PlaceTier, ThemeColors } from '../types/math';
+import {
+  ARROW_TIP_WIDTH,
+  CARD_HEIGHT,
+  DIGIT_WIDTH,
+  THEMES,
+  getArrowCardWidth,
+  getPlaceTier,
+} from '../../arrow-cards/src';
+import { ArrowCardData, PlaceTier } from '../types/math';
 
-export const THEMES: Record<ColorTheme, ThemeColors> = {
-  curriculum: {
-    name: 'UK Primary Standard',
-    thousands: {
-      bg: '#fee2e2',
-      border: '#ef4444',
-      text: '#991b1b',
-      fill: '#fecaca',
-      accent: '#dc2626',
-    },
-    hundreds: {
-      bg: '#e0f2fe',
-      border: '#0284c7',
-      text: '#075985',
-      fill: '#bae6fd',
-      accent: '#0284c7',
-    },
-    tens: {
-      bg: '#dcfce7',
-      border: '#22c55e',
-      text: '#166534',
-      fill: '#bbf7d0',
-      accent: '#16a34a',
-    },
-    ones: {
-      bg: '#fef9c3',
-      border: '#eab308',
-      text: '#854d0e',
-      fill: '#fef08a',
-      accent: '#ca8a04',
-    },
-  },
-  montessori: {
-    name: 'Montessori Classic',
-    thousands: {
-      bg: '#dcfce7',
-      border: '#15803d',
-      text: '#14532d',
-      fill: '#bbf7d0',
-      accent: '#16a34a',
-    },
-    hundreds: {
-      bg: '#fee2e2',
-      border: '#b91c1c',
-      text: '#7f1d1d',
-      fill: '#fecaca',
-      accent: '#dc2626',
-    },
-    tens: {
-      bg: '#dbeafe',
-      border: '#1d4ed8',
-      text: '#1e3a8a',
-      fill: '#bfdbfe',
-      accent: '#2563eb',
-    },
-    ones: {
-      bg: '#dcfce7',
-      border: '#15803d',
-      text: '#14532d',
-      fill: '#bbf7d0',
-      accent: '#16a34a',
-    },
-  },
-  pastel: {
-    name: 'Modern Studio Pastel',
-    thousands: {
-      bg: '#ede9fe',
-      border: '#7c3aed',
-      text: '#5b21b6',
-      fill: '#ddd6fe',
-      accent: '#8b5cf6',
-    },
-    hundreds: {
-      bg: '#ccfbf1',
-      border: '#0d9488',
-      text: '#115e59',
-      fill: '#99f6e4',
-      accent: '#14b8a6',
-    },
-    tens: {
-      bg: '#ffedd5',
-      border: '#ea580c',
-      text: '#9a3412',
-      fill: '#fed7aa',
-      accent: '#f97316',
-    },
-    ones: {
-      bg: '#ffe4e6',
-      border: '#e11d48',
-      text: '#9f1239',
-      fill: '#fecdd3',
-      accent: '#f43f5e',
-    },
-  },
-  vibrant: {
-    name: 'High Contrast Bold',
-    thousands: {
-      bg: '#312e81',
-      border: '#4338ca',
-      text: '#ffffff',
-      fill: '#3730a3',
-      accent: '#6366f1',
-    },
-    hundreds: {
-      bg: '#064e3b',
-      border: '#047857',
-      text: '#ffffff',
-      fill: '#065f46',
-      accent: '#10b981',
-    },
-    tens: {
-      bg: '#78350f',
-      border: '#b45309',
-      text: '#ffffff',
-      fill: '#92400e',
-      accent: '#f59e0b',
-    },
-    ones: {
-      bg: '#881337',
-      border: '#be123c',
-      text: '#ffffff',
-      fill: '#9f1239',
-      accent: '#f43f5e',
-    },
-  },
-};
+// Re-export the card design tokens so existing app code can keep importing
+// them from this module.
+export { THEMES, DIGIT_WIDTH, ARROW_TIP_WIDTH, CARD_HEIGHT };
 
-export const DIGIT_WIDTH = 58; // Width per digit in card
-export const ARROW_TIP_WIDTH = 28; // Triangular tip length
-export const CARD_HEIGHT = 68; // Height of card
+// Aligns with the 24px dot grid painted on the workbench.
+export const GRID_SIZE = 24;
+
+export function snapToGrid(value: number, gridSize = GRID_SIZE): number {
+  return Math.round(value / gridSize) * gridSize;
+}
+
+export function snapPosition(
+  x: number,
+  y: number,
+  gridSize = GRID_SIZE
+): { x: number; y: number } {
+  return {
+    x: snapToGrid(x, gridSize),
+    y: snapToGrid(y, gridSize),
+  };
+}
 
 export function getCardWidth(place: 1000 | 100 | 10 | 1): number {
-  const digitCount = place === 1000 ? 4 : place === 100 ? 3 : place === 10 ? 2 : 1;
-  return digitCount * DIGIT_WIDTH + ARROW_TIP_WIDTH;
+  return getArrowCardWidth(place);
 }
 
 export function getTierFromPlace(place: 1000 | 100 | 10 | 1): PlaceTier {
-  if (place === 1000) return 'thousands';
-  if (place === 100) return 'hundreds';
-  if (place === 10) return 'tens';
-  return 'ones';
+  return getPlaceTier(place);
 }
 
 export function decomposeNumber(num: number): {

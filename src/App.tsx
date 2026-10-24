@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowCardData, CardGroupData, ColorTheme } from './types/math';
-import { createCard, decomposeNumber, getCardWidth, CARD_HEIGHT } from './utils/mathHelpers';
+import {
+  createCard,
+  decomposeNumber,
+  getCardWidth,
+  CARD_HEIGHT,
+  snapPosition,
+  snapToGrid,
+} from './utils/mathHelpers';
 import { sound } from './utils/audio';
 import { ArrowCardItem } from './components/ArrowCardItem';
 import { CardGroupItem } from './components/CardGroupItem';
@@ -108,6 +115,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [theme, setTheme] = useState<ColorTheme>('curriculum');
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isGridSnapEnabled, setIsGridSnapEnabled] = useState<boolean>(true);
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [snapCandidateId, setSnapCandidateId] = useState<string | null>(null);
   const [bounceCandidateId, setBounceCandidateId] = useState<string | null>(null);
@@ -115,12 +123,24 @@ export default function App() {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Snap a coordinate / position to the workbench grid when enabled.
+  const snapCoord = useCallback(
+    (value: number) => (isGridSnapEnabled ? snapToGrid(value) : value),
+    [isGridSnapEnabled]
+  );
+
+  const snapPoint = useCallback(
+    (x: number, y: number) =>
+      isGridSnapEnabled ? snapPosition(x, y) : { x, y },
+    [isGridSnapEnabled]
+  );
+
   // Initialize with initial pedagogical example (e.g. 3000, 400, 20, 5)
   useEffect(() => {
-    const c1 = createCard(1000, 3, 100, 160);
-    const c2 = createCard(100, 4, 390, 160);
-    const c3 = createCard(10, 2, 620, 160);
-    const c4 = createCard(1, 5, 790, 160);
+    const c1 = createCard(1000, 3, snapToGrid(100), snapToGrid(160));
+    const c2 = createCard(100, 4, snapToGrid(390), snapToGrid(160));
+    const c3 = createCard(10, 2, snapToGrid(620), snapToGrid(160));
+    const c4 = createCard(1, 5, snapToGrid(790), snapToGrid(160));
     setCards([c1, c2, c3, c4]);
     setSelectedId(c1.id);
   }, []);
@@ -132,11 +152,16 @@ export default function App() {
     sound.setMuted(next);
   };
 
+  // Toggle grid snapping on/off
+  const handleToggleGridSnap = () => {
+    setIsGridSnapEnabled((prev) => !prev);
+  };
+
   // Add individual card from bank (on click)
   const handleAddCard = (place: 1000 | 100 | 10 | 1, digit: number) => {
     sound.playPickUp();
-    const startX = 120 + Math.random() * 140;
-    const startY = 140 + Math.random() * 100;
+    const startX = snapCoord(120 + Math.random() * 140);
+    const startY = snapCoord(140 + Math.random() * 100);
     const newCard = createCard(place, digit, startX, startY);
     setCards((prev) => [...prev, newCard]);
     setSelectedId(newCard.id);
@@ -147,27 +172,27 @@ export default function App() {
     const { thousands, hundreds, tens, ones } = decomposeNumber(num);
     const created: ArrowCardData[] = [];
 
-    const baseX = 120 + Math.random() * 80;
-    const baseY = 160 + Math.random() * 80;
+    const baseX = snapCoord(120 + Math.random() * 80);
+    const baseY = snapCoord(160 + Math.random() * 80);
 
     let currentX = baseX;
     if (thousands > 0) {
-      const c = createCard(1000, thousands, currentX, baseY);
+      const c = createCard(1000, thousands, snapCoord(currentX), baseY);
       created.push(c);
       currentX += getCardWidth(1000) + 20;
     }
     if (hundreds > 0) {
-      const c = createCard(100, hundreds, currentX, baseY);
+      const c = createCard(100, hundreds, snapCoord(currentX), baseY);
       created.push(c);
       currentX += getCardWidth(100) + 20;
     }
     if (tens > 0) {
-      const c = createCard(10, tens, currentX, baseY);
+      const c = createCard(10, tens, snapCoord(currentX), baseY);
       created.push(c);
       currentX += getCardWidth(10) + 20;
     }
     if (ones > 0) {
-      const c = createCard(1, ones, currentX, baseY);
+      const c = createCard(1, ones, snapCoord(currentX), baseY);
       created.push(c);
       currentX += getCardWidth(1) + 20;
     }
@@ -222,8 +247,8 @@ export default function App() {
       }
 
       if (currentStack.length > 1) {
-        const groupX = 100 + (groupIndex % 2) * 440;
-        const groupY = 140 + Math.floor(groupIndex / 2) * 110;
+        const groupX = snapCoord(100 + (groupIndex % 2) * 440);
+        const groupY = snapCoord(140 + Math.floor(groupIndex / 2) * 110);
         newGroups.push({
           id: `group-autosnap-${Date.now()}-${groupIndex}`,
           cards: currentStack,
@@ -257,14 +282,15 @@ export default function App() {
       excludeCardId?: string
     ): { snapTargetId: string | null; bounceTargetId: string | null } => {
       const cardWidth = getCardWidth(cardPlace);
+      const { x: snappedX, y: snappedY } = snapPoint(currentX, currentY);
 
       // Check standalone cards for strictly physical overlap
       for (const other of cards) {
         if (other.id === excludeCardId) continue;
         const otherWidth = getCardWidth(other.place);
         const { isOverlapping } = getBoxOverlap(
-          currentX,
-          currentY,
+          snappedX,
+          snappedY,
           cardWidth,
           CARD_HEIGHT,
           other.x,
@@ -288,8 +314,8 @@ export default function App() {
       for (const g of groups) {
         const maxGroupWidth = Math.max(...g.cards.map((c) => getCardWidth(c.place)));
         const { isOverlapping } = getBoxOverlap(
-          currentX,
-          currentY,
+          snappedX,
+          snappedY,
           cardWidth,
           CARD_HEIGHT,
           g.x,
@@ -310,7 +336,7 @@ export default function App() {
 
       return { snapTargetId: null, bounceTargetId: null };
     },
-    [cards, groups]
+    [cards, groups, snapPoint]
   );
 
   // Dragging individual card: proximity checking (ONLY triggers when starting to overlap!)
@@ -332,11 +358,12 @@ export default function App() {
   // Drag end for an EXISTING card on the workbench
   const handleCardDragEnd = (
     card: ArrowCardData,
-    finalX: number,
-    finalY: number
+    rawX: number,
+    rawY: number
   ) => {
     setSnapCandidateId(null);
     setBounceCandidateId(null);
+    const { x: finalX, y: finalY } = snapPoint(rawX, rawY);
     const cardWidth = getCardWidth(card.place);
     const cardRightX = finalX + cardWidth;
 
@@ -367,7 +394,7 @@ export default function App() {
         // CASE A: SAME PLACE VALUE (e.g. 4 on top of 8) -> BOUNCE OUT!
         if (other.place === card.place) {
           sound.playBounce();
-          const { bounceX, bounceY } = calculateBouncePosition(
+          const bounce = calculateBouncePosition(
             finalX,
             finalY,
             cardWidth,
@@ -377,6 +404,7 @@ export default function App() {
             containerW,
             containerH
           );
+          const { x: bounceX, y: bounceY } = snapPoint(bounce.bounceX, bounce.bounceY);
 
           // Bounce the dragged card away; stationary card 'other' stays untouched!
           setCards((prev) =>
@@ -445,7 +473,7 @@ export default function App() {
         // CASE A: GROUP ALREADY HAS THIS PLACE VALUE -> BOUNCE OUT!
         if (hasSamePlace) {
           sound.playBounce();
-          const { bounceX, bounceY } = calculateBouncePosition(
+          const bounce = calculateBouncePosition(
             finalX,
             finalY,
             cardWidth,
@@ -455,6 +483,7 @@ export default function App() {
             containerW,
             containerH
           );
+          const { x: bounceX, y: bounceY } = snapPoint(bounce.bounceX, bounce.bounceY);
 
           // Bounce the dragged card away; group stays untouched!
           setCards((prev) =>
@@ -508,9 +537,11 @@ export default function App() {
     const rawX = clientX - rect.left + containerRef.current.scrollLeft;
     const rawY = clientY - rect.top + containerRef.current.scrollTop;
 
-    // Center card under pointer, and clamp within visible bounds
-    const dropX = Math.max(20, Math.min(rect.width - cardWidth - 20, rawX - cardWidth / 2));
-    const dropY = Math.max(20, Math.min(rect.height - CARD_HEIGHT - 20, rawY - CARD_HEIGHT / 2));
+    // Center card under pointer, snap to the grid, and clamp within visible bounds
+    const { x: dropX, y: dropY } = snapPoint(
+      Math.max(20, Math.min(rect.width - cardWidth - 20, rawX - cardWidth / 2)),
+      Math.max(20, Math.min(rect.height - CARD_HEIGHT - 20, rawY - CARD_HEIGHT / 2))
+    );
 
     const newCard = createCard(place, digit, dropX, dropY);
     const cardRightX = dropX + cardWidth;
@@ -536,7 +567,7 @@ export default function App() {
         // SAME PLACE VALUE -> BOUNCE OUT!
         if (other.place === newCard.place) {
           sound.playBounce();
-          const { bounceX, bounceY } = calculateBouncePosition(
+          const bounce = calculateBouncePosition(
             dropX,
             dropY,
             cardWidth,
@@ -546,6 +577,7 @@ export default function App() {
             containerW,
             containerH
           );
+          const { x: bounceX, y: bounceY } = snapPoint(bounce.bounceX, bounce.bounceY);
 
           const bouncedCard = createCard(place, digit, bounceX, bounceY);
           setCards((prev) => [...prev, bouncedCard]);
@@ -609,7 +641,7 @@ export default function App() {
         // SAME PLACE VALUE IN GROUP -> BOUNCE OUT!
         if (hasSamePlace) {
           sound.playBounce();
-          const { bounceX, bounceY } = calculateBouncePosition(
+          const bounce = calculateBouncePosition(
             dropX,
             dropY,
             cardWidth,
@@ -619,6 +651,7 @@ export default function App() {
             containerW,
             containerH
           );
+          const { x: bounceX, y: bounceY } = snapPoint(bounce.bounceX, bounce.bounceY);
 
           const bouncedCard = createCard(place, digit, bounceX, bounceY);
           setCards((prev) => [...prev, bouncedCard]);
@@ -654,7 +687,12 @@ export default function App() {
   // Duplicate card
   const handleDuplicateCard = (card: ArrowCardData) => {
     sound.playPickUp();
-    const copy = createCard(card.place, card.digit, card.x + 30, card.y + 30);
+    const copy = createCard(
+      card.place,
+      card.digit,
+      snapCoord(card.x + 30),
+      snapCoord(card.y + 30)
+    );
     setCards((prev) => [...prev, copy]);
     setSelectedId(copy.id);
   };
@@ -672,13 +710,14 @@ export default function App() {
     currentY: number
   ) => {
     const groupWidth = Math.max(...group.cards.map((c) => getCardWidth(c.place)));
+    const { x: snappedX, y: snappedY } = snapPoint(currentX, currentY);
 
     // 1. Check against standalone cards (e.g. dragging 25 over 400)
     for (const other of cards) {
       const otherWidth = getCardWidth(other.place);
       const { isOverlapping } = getBoxOverlap(
-        currentX,
-        currentY,
+        snappedX,
+        snappedY,
         groupWidth,
         CARD_HEIGHT,
         other.x,
@@ -705,8 +744,8 @@ export default function App() {
       if (other.id === group.id) continue;
       const otherWidth = Math.max(...other.cards.map((c) => getCardWidth(c.place)));
       const { isOverlapping } = getBoxOverlap(
-        currentX,
-        currentY,
+        snappedX,
+        snappedY,
         groupWidth,
         CARD_HEIGHT,
         other.x,
@@ -737,12 +776,13 @@ export default function App() {
   // Drag group end
   const handleGroupDragEnd = (
     group: CardGroupData,
-    finalX: number,
-    finalY: number
+    rawX: number,
+    rawY: number
   ) => {
     setSnapCandidateId(null);
     setBounceCandidateId(null);
 
+    const { x: finalX, y: finalY } = snapPoint(rawX, rawY);
     const groupWidth = Math.max(...group.cards.map((c) => getCardWidth(c.place)));
     const containerW = containerRef.current?.clientWidth ?? 1100;
     const containerH = containerRef.current?.clientHeight ?? 650;
@@ -769,7 +809,7 @@ export default function App() {
         if (hasConflict) {
           // SAME PLACE VALUE COLLISION -> BOUNCE GROUP AWAY!
           sound.playBounce();
-          const { bounceX, bounceY } = calculateBouncePosition(
+          const bounce = calculateBouncePosition(
             finalX,
             finalY,
             groupWidth,
@@ -779,6 +819,7 @@ export default function App() {
             containerW,
             containerH
           );
+          const { x: bounceX, y: bounceY } = snapPoint(bounce.bounceX, bounce.bounceY);
 
           setGroups((prev) =>
             prev.map((g) => (g.id === group.id ? { ...g, x: bounceX, y: bounceY } : g))
@@ -854,7 +895,7 @@ export default function App() {
 
         if (sharesPlace) {
           sound.playBounce();
-          const { bounceX, bounceY } = calculateBouncePosition(
+          const bounce = calculateBouncePosition(
             finalX,
             finalY,
             groupWidth,
@@ -864,6 +905,7 @@ export default function App() {
             containerW,
             containerH
           );
+          const { x: bounceX, y: bounceY } = snapPoint(bounce.bounceX, bounce.bounceY);
 
           setGroups((prev) =>
             prev.map((g) => (g.id === group.id ? { ...g, x: bounceX, y: bounceY } : g))
@@ -937,8 +979,8 @@ export default function App() {
     const newGroup: CardGroupData = {
       ...group,
       id: `group-copy-${Date.now()}`,
-      x: group.x + 40,
-      y: group.y + 40,
+      x: snapCoord(group.x + 40),
+      y: snapCoord(group.y + 40),
       cards: group.cards.map((c) => ({
         ...c,
         id: `card-copy-${c.place}-${c.digit}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1049,6 +1091,8 @@ export default function App() {
         onThemeChange={setTheme}
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
+        isGridSnapEnabled={isGridSnapEnabled}
+        onToggleGridSnap={handleToggleGridSnap}
         onClearCanvas={handleClearCanvas}
         onAutoSnapAll={handleAutoSnapAll}
         onOpenHelp={() => setShowHelp(true)}
@@ -1061,14 +1105,18 @@ export default function App() {
         <div
           ref={containerRef}
           onClick={() => setSelectedId(null)}
-          className="flex-1 relative overflow-auto select-none bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]"
+          className={`flex-1 relative overflow-auto select-none [background-size:24px_24px] ${
+            isGridSnapEnabled
+              ? 'bg-[linear-gradient(to_right,#e8eef5_1px,transparent_1px),linear-gradient(to_bottom,#e8eef5_1px,transparent_1px)]'
+              : 'bg-[radial-gradient(#e2e8f0_1px,transparent_1px)]'
+          }`}
           style={{ minHeight: 450 }}
         >
           {/* Helpful interactive prompt banner */}
           <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-xs px-3.5 py-1.5 rounded-xl shadow-xs border border-slate-200 text-xs text-slate-600 pointer-events-none">
             <Move className="w-3.5 h-3.5 text-blue-600" />
             <span>
-              <strong>Tip:</strong> Drag cards to overlap to snap! Same place value cards bounce away.
+              <strong>Tip:</strong> Cards line up on the grid. Drag one onto another to snap them together!
             </span>
           </div>
 
@@ -1140,8 +1188,8 @@ export default function App() {
         <div
           style={{
             position: 'fixed',
-            left: draggingBankCard.x - getCardWidth(draggingBankCard.place) / 2,
-            top: draggingBankCard.y - CARD_HEIGHT / 2,
+            left: snapCoord(draggingBankCard.x - getCardWidth(draggingBankCard.place) / 2),
+            top: snapCoord(draggingBankCard.y - CARD_HEIGHT / 2),
             zIndex: 9999,
             pointerEvents: 'none',
             filter: 'drop-shadow(0 14px 28px rgba(0,0,0,0.25))',
