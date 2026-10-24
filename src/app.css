@@ -1,0 +1,249 @@
+/* -------------------------------------------------------------------------- */
+/* Arrow Math · design tokens                                                   */
+/* -------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  --font-body: 'Avenir Next', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: ui-rounded, 'SF Pro Rounded', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+
+  --bg: #f1f4f9;
+  --panel: #ffffff;
+  --surface-muted: #f2f5f9;
+  --ink: #162033;
+  --muted: #6b7b91;
+  --muted-strong: #475569;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --accent-soft: #eaf1ff;
+  --danger: #dc2626;
+
+  --canvas-bg: #fbfcfe;
+  --canvas-grid: rgba(148, 163, 184, 0.15);
+  --canvas-glow: rgba(59, 130, 246, 0.055);
+
+  /* Interaction affordances, shared by the halo, ghost and toasts. Each has an
+     "ink" partner for text on light panels; dark themes re-declare them. */
+  --halo: #3b82f6;
+  --halo-ink: #1d4ed8;
+  --warn: #f59e0b;
+  --warn-ink: #92400e;
+  --peel: #8b5cf6;
+  --success: #10b981;
+  --success-ink: #047857;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.045);
+  --shadow-md: 0 2px 4px rgba(15, 23, 42, 0.05), 0 10px 24px rgba(15, 23, 42, 0.09);
+  --shadow-lg: 0 8px 18px rgba(15, 23, 42, 0.08), 0 24px 56px rgba(15, 23, 42, 0.14);
+}
+
+.app[data-theme='montessori'] {
+  color-scheme: light;
+  --bg: #f4f1e8;
+  --panel: #fffdf8;
+  --surface-muted: #f5f1e6;
+  --ink: #243229;
+  --muted: #75806e;
+  --muted-strong: #4d5a4a;
+  --line: #e5dfd0;
+  --line-strong: #cec6b2;
+  --accent: #15803d;
+  --accent-strong: #166534;
+  --accent-soft: #e9f7ed;
+  --danger: #b91c1c;
+  --canvas-bg: #fcfaf4;
+  --canvas-grid: rgba(120, 113, 88, 0.13);
+  --canvas-glow: rgba(21, 128, 61, 0.055);
+  --shadow-xs: 0 1px 2px rgba(58, 52, 35, 0.05);
+  --shadow-sm: 0 1px 2px rgba(58, 52, 35, 0.04), 0 6px 16px rgba(58, 52, 35, 0.05);
+  --shadow-md: 0 2px 4px rgba(58, 52, 35, 0.05), 0 10px 24px rgba(58, 52, 35, 0.09);
+  --shadow-lg: 0 8px 18px rgba(58, 52, 35, 0.08), 0 24px 56px rgba(58, 52, 35, 0.14);
+}
+
+.app[data-theme='pastel'] {
+  color-scheme: light;
+  --bg: #f4f2fb;
+  --panel: #ffffff;
+  --surface-muted: #f5f2fc;
+  --ink: #2a2440;
+  --muted: #7c7692;
+  --muted-strong: #514a6c;
+  --line: #e9e4f4;
+  --line-strong: #d5cdea;
+  --accent: #7c3aed;
+  --accent-strong: #6d28d9;
+  --accent-soft: #f1ebff;
+  --danger: #e11d48;
+  --canvas-bg: #fcfbff;
+  --canvas-grid: rgba(139, 128, 170, 0.14);
+  --canvas-glow: rgba(124, 58, 237, 0.055);
+  --shadow-xs: 0 1px 2px rgba(45, 36, 66, 0.05);
+  --shadow-sm: 0 1px 2px rgba(45, 36, 66, 0.04), 0 6px 16px rgba(45, 36, 66, 0.05);
+  --shadow-md: 0 2px 4px rgba(45, 36, 66, 0.05), 0 10px 24px rgba(45, 36, 66, 0.09);
+  --shadow-lg: 0 8px 18px rgba(45, 36, 66, 0.08), 0 24px 56px rgba(45, 36, 66, 0.14);
+}
+
+.app[data-theme='vibrant'] {
+  color-scheme: dark;
+  --bg: #070c15;
+  --panel: #101827;
+  --surface-muted: #172234;
+  --ink: #f8fafc;
+  --muted: #94a3b8;
+  --muted-strong: #cbd5e1;
+  --line: #253247;
+  --line-strong: #3b4c66;
+  --accent: #60a5fa;
+  --accent-strong: #93c5fd;
+  --accent-soft: #13294b;
+  --danger: #f87171;
+  --canvas-bg: #0b1320;
+  --canvas-grid: rgba(148, 163, 184, 0.13);
+  --canvas-glow: rgba(96, 165, 250, 0.08);
+
+  /* Same hues, but with inks light enough to read on the dark panel. */
+  --halo: #3b82f6;
+  --halo-ink: #bfdbfe;
+  --warn: #f59e0b;
+  --warn-ink: #fde68a;
+  --peel: #a78bfa;
+  --success: #34d399;
+  --success-ink: #6ee7b7;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25), 0 6px 16px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.26), 0 10px 24px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 18px rgba(0, 0, 0, 0.25), 0 24px 56px rgba(0, 0, 0, 0.4);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Base                                                                        */
+/* -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+#app {
+  height: 100%;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: var(--line-strong);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+
+/* -------------------------------------------------------------------------- */
+/* App shell                                                                   */
+/* -------------------------------------------------------------------------- */
+
+.app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(1100px 520px at 88% -18%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 62%),
+    radial-gradient(900px 500px at -8% 105%, rgba(245, 158, 11, 0.045), transparent 62%),
+    var(--bg);
+  color: var(--ink);
+  transition:
+    background-color 220ms ease,
+    color 220ms ease;
+}
+
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  padding: 0 clamp(14px, 2vw, 26px) 10px;
+}
+
+.app.interacting {
+  cursor: grabbing;
+}
+
+.app.interacting * {
+  cursor: grabbing !important;
+}
+
+.app.interacting input,
+.app.interacting select {
+  cursor: default !important;
+}
+
+/* Give the whole experience a little more breathing room on short screens. */
+@media (max-height: 720px) {
+  .workspace {
+    padding-bottom: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace {
+    padding-inline: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app {
+    transition: none;
+  }
+}

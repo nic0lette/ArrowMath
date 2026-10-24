@@ -1,6 +1,0 @@
-{
-  "name": "Arrow Math - Place Value Cards",
-  "description": "Interactive math learning tool with draggable place-value arrow cards (1s, 10s, 100s, 1000s) that snap together to teach expanded form and number composition.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
