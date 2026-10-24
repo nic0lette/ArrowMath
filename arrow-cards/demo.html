@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arrow Cards — visual demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 28px;
+        background: rgba(255, 255, 255, 0.94);
+        border-bottom: 1px solid #e2e8f0;
+        backdrop-filter: blur(8px);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+
+      header p {
+        margin: 3px 0 0;
+        color: #64748b;
+        font-size: 12px;
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-size: 13px;
+        color: #475569;
+      }
+
+      select {
+        margin-left: 6px;
+        padding: 5px 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        background: white;
+        color: inherit;
+        font: inherit;
+      }
+
+      label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+
+      main {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .tier {
+        margin-bottom: 30px;
+      }
+
+      .tier-heading {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .tier-heading h2 {
+        margin: 0;
+        font-size: 14px;
+        color: #334155;
+      }
+
+      .tier-heading span {
+        color: #94a3b8;
+        font-size: 12px;
+      }
+
+      .cards {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 18px;
+        background-color: #fff;
+        background-image:
+          linear-gradient(to right, #eef2f6 1px, transparent 1px),
+          linear-gradient(to bottom, #eef2f6 1px, transparent 1px);
+        background-size: 24px 24px;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+      }
+
+      .card {
+        transform-origin: left center;
+      }
+
+      .card:hover {
+        transform: translateY(-2px);
+      }
+
+      .snippet {
+        margin-top: 36px;
+        padding: 18px;
+        overflow-x: auto;
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 14px;
+        font-size: 12px;
+        line-height: 1.65;
+      }
+
+      .snippet code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .accent {
+        color: #93c5fd;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Arrow Cards</h1>
+        <p>Place-value cards rendered by the standalone library.</p>
+      </div>
+      <div class="controls">
+        <label>
+          Theme
+          <select id="theme"></select>
+        </label>
+        <label>
+          <input id="zero-ghost" type="checkbox" />
+          X-ray zeros
+        </label>
+      </div>
+    </header>
+
+    <main>
+      <div id="tiers"></div>
+
+      <div class="snippet">
+        <code>
+          <span class="accent">import</span> { renderArrowCardSvg } <span class="accent">from</span>
+          './src/index.ts';<br /><br />
+          element.innerHTML = renderArrowCardSvg({<br />
+          &nbsp;&nbsp;place: <span class="accent">1000</span>, digit: <span class="accent">3</span>,
+          theme: <span class="accent">'curriculum'</span><br />
+          });
+        </code>
+      </div>
+    </main>
+
+    <script type="module">
+      import { renderArrowCardSvg, THEMES } from './src/index.ts';
+
+      const TIERS = [
+        { place: 1000, label: 'Thousands', hint: '4 slots + arrow' },
+        { place: 100, label: 'Hundreds', hint: '3 slots + arrow' },
+        { place: 10, label: 'Tens', hint: '2 slots + arrow' },
+        { place: 1, label: 'Ones', hint: '1 slot + arrow' },
+      ];
+
+      const themeSelect = document.querySelector('#theme');
+      const zeroGhost = document.querySelector('#zero-ghost');
+      const tiers = document.querySelector('#tiers');
+
+      for (const [key, value] of Object.entries(THEMES)) {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = value.name;
+        themeSelect.append(option);
+      }
+
+      function render() {
+        const theme = themeSelect.value;
+        const showZeroGhost = zeroGhost.checked;
+        tiers.innerHTML = '';
+
+        for (const tier of TIERS) {
+          const section = document.createElement('section');
+          section.className = 'tier';
+          section.innerHTML = `
+            <div class="tier-heading">
+              <h2>${tier.label}</h2>
+              <span>${tier.hint}</span>
+            </div>
+            <div class="cards"></div>
+          `;
+
+          const cards = section.querySelector('.cards');
+          for (let digit = 1; digit <= 9; digit++) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = renderArrowCardSvg({
+              place: tier.place,
+              digit,
+              theme,
+              showZeroGhost,
+              idPrefix: `demo-${tier.place}-${digit}`,
+            });
+            cards.append(card);
+          }
+
+          tiers.append(section);
+        }
+      }
+
+      themeSelect.addEventListener('change', render);
+      zeroGhost.addEventListener('change', render);
+      render();
+    </script>
+  </body>
+</html>

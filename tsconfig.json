@@ -1,27 +1,24 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false,
     "module": "ESNext",
-    "types": ["vite/client"],
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "skipLibCheck": true,
     "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
     "isolatedModules": true,
-    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
     "allowJs": true,
-    "jsx": "react-jsx",
+    "checkJs": false,
+    "ignoreDeprecations": "6.0",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "arrow-cards": ["./arrow-cards/src/index.ts"],
+      "arrow-cards/svelte": ["./arrow-cards/src/svelte/ArrowCard.svelte"]
     },
-    "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+    "types": ["svelte", "node"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts", "vitest.config.ts", "playwright.config.ts", "tests/**/*.ts"]
 }
