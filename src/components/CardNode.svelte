@@ -2,6 +2,7 @@
   import ArrowCard from 'arrow-cards/svelte';
   import { getArrowCardWidth, type ColorTheme } from 'arrow-cards';
   import { cardMotion, type SpringConfig } from '../lib/cardMotion';
+  import { curlLength, paperCurl } from '../lib/paperCurl';
   import { game } from '../lib/state.svelte';
   import { isPeelZone, placeTier, type Card, type PieceMode } from '../lib/geometry';
 
@@ -17,7 +18,6 @@
     grouped: boolean;
     xray: boolean;
     dragging: boolean;
-    covered: boolean;
     visibleWidth: number;
     spring: SpringConfig;
   }
@@ -34,7 +34,6 @@
     grouped,
     xray,
     dragging,
-    covered,
     visibleWidth,
     spring,
   }: Props = $props();
@@ -49,25 +48,10 @@
   const moveIntent = $derived(
     grouped && game.intent?.kind === 'move' && game.intent.pieceId === pieceId,
   );
-  // Leave a few pixels of the hidden part under the covering card so the cut
-  // edge stays tucked away instead of peeking through its rounded corners.
-  const liftClip = $derived(Math.min(width, visibleWidth + 8));
-
-  // Hold the clip for the length of the settle so a card leaving the aim state
-  // cannot flash its hidden portion above the cards on top of it.
-  let clipHold = $state(false);
-  $effect(() => {
-    if (peelLift) {
-      clipHold = true;
-      return;
-    }
-    if (!clipHold) return;
-    const timer = setTimeout(() => {
-      clipHold = false;
-    }, 200);
-    return () => clearTimeout(timer);
-  });
-  const liftClipped = $derived(covered && clipHold);
+  // Aiming at the digit end bends it up like paper, from where the next card
+  // holds it down. Once the card is pulled out it is dragging and flattens.
+  const curlBent = $derived(peelLift && !dragging);
+  const curl = $derived(curlLength(width, visibleWidth));
   const placeTierName = $derived(placeTier(card.place));
   const actionLabel = $derived(
     !grouped
@@ -129,12 +113,10 @@
   class:dragging
   class:show-through={showThrough}
   class:peel-lift={peelLift}
-  class:lift-clipped={liftClipped}
   class:move-intent={moveIntent}
   style:z-index={z}
   style:width="{width}px"
   style:height="68px"
-  style:--card-lift-clip="{liftClip}px"
   use:cardMotion={{ x, y, immediate: dragging, spring }}
   role="button"
   tabindex="0"
@@ -164,6 +146,7 @@
     {#if showThrough}
       <span class="peek-edge" aria-hidden="true"></span>
     {/if}
+    <div class="paper-layer" use:paperCurl={{ bent: curlBent, width, length: curl }}></div>
   </div>
 </div>
 
@@ -208,22 +191,17 @@
     filter: drop-shadow(0 10px 12px rgba(15, 23, 42, 0.14));
   }
 
-  /* Aiming at the flat, leading-digit end: this card alone lifts. A card that
-     is buried in a stack is clipped to its exposed part, so it slides up from
-     under the cards on top rather than rising through them. */
+  /* Aiming at the flat, leading-digit end: the paper layer bends that end up
+     and draws its own shadows, so the card itself stays put. */
   .card-node.peel-lift:not(.dragging) .card-inner {
-    transform: translateY(-5px);
-    filter:
-      drop-shadow(0 10px 10px rgba(15, 23, 42, 0.16))
-      drop-shadow(0 2px 3px rgba(15, 23, 42, 0.1));
-    transition:
-      transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      opacity 220ms ease,
-      filter 180ms ease;
+    transform: none;
+    filter: none;
   }
 
-  .card-node.lift-clipped:not(.dragging) .card-inner {
-    clip-path: inset(-16px calc(100% - var(--card-lift-clip)) -18px -16px);
+  .paper-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
   }
 
   /* Aiming at the arrow side: the whole group lifts as one object. */

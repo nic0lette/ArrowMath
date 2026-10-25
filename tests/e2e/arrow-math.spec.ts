@@ -340,12 +340,13 @@ test('the digit end lifts one card and the arrow side lifts the whole stack', as
   await expect(page.locator('.card-node[data-place="100"].peel-lift')).toHaveCount(1);
   await expect(page.locator('.card-node.move-intent')).toHaveCount(0);
 
-  // A buried card is clipped to the part that is not covered, so its hidden
-  // right-hand side cannot rise through the cards stacked on top of it.
-  const clipPath = await page
-    .locator('.card-node[data-place="100"].peel-lift .card-inner')
-    .evaluate((element) => getComputedStyle(element).clipPath);
-  expect(clipPath).toContain('inset');
+  // The digit end bends up like paper. While it bends, the paper layer draws
+  // the card and the SVG is hidden, so the two never show at once.
+  const hundredsPaper = page.locator('.card-node[data-place="100"] .paper-layer');
+  await expect(hundredsPaper).toHaveAttribute('data-bent', 'true');
+  await expect(page.locator('.card-node[data-place="100"] .paper-canvas')).toBeVisible();
+  await expect(page.locator('.card-node[data-place="100"] .arrow-card')).toBeHidden();
+  await expect(page.locator('.paper-layer[data-bent="true"]')).toHaveCount(1);
 
   // Pressing keeps the stack calm and the card lifted until the movement
   // threshold is crossed.
@@ -364,6 +365,9 @@ test('the digit end lifts one card and the arrow side lifts the whole stack', as
 
   await expect(page.locator('.card-node.peel-lift')).toHaveCount(0);
   await expect(page.locator('.card-node.move-intent')).toHaveCount(4);
+  // Moving off the digit end flattens the card and brings its SVG back.
+  await expect(hundredsPaper).toHaveAttribute('data-bent', 'false');
+  await expect(page.locator('.card-node[data-place="100"] .arrow-card')).toBeVisible();
 
   await page.mouse.move(24, 300);
   await expect(page.locator('.card-node.move-intent')).toHaveCount(0);
