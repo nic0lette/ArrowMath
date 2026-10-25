@@ -5,3 +5,6 @@ dist/
 test-results/
 playwright-report/
 coverage/
+
+# Throwaway local probe scripts
+*.tmp.mjs

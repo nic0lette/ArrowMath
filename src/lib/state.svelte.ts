@@ -221,6 +221,7 @@ class ArrowMathStore {
   private bounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private resetSnapshot: Piece[] | null = null;
   private lastCanvasWidth = 0;
+  private lastCanvasHeight = 0;
   private pendingBoardClamp = false;
   private boardWatcherStop: (() => void) | null = null;
 
@@ -413,10 +414,16 @@ class ArrowMathStore {
       this.keepPiecesInView();
     }
 
-    if (this.lastCanvasWidth > 0 && width !== this.lastCanvasWidth) {
+    // Height matters as much as width: opening the card tray shortens the
+    // workbench and would otherwise hide cards resting near the bottom.
+    if (
+      this.lastCanvasWidth > 0 &&
+      (width !== this.lastCanvasWidth || height !== this.lastCanvasHeight)
+    ) {
       this.keepPiecesInView();
     }
     this.lastCanvasWidth = width;
+    this.lastCanvasHeight = height;
   }
 
   private keepPiecesInView(): void {
@@ -976,6 +983,9 @@ class ArrowMathStore {
     target.x = position.x;
     target.y = position.y;
     target.spring = 'default';
+    // The anchor rule grows a stack leftwards and a chain rightwards, so a
+    // merge at the workbench edge can reach past it. Staying visible wins.
+    this.fitPieceInCanvas(target);
 
     this.pieces = this.pieces.filter((piece) => piece.id !== source.id);
     this.bringToFront(target);

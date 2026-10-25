@@ -92,6 +92,9 @@ export function pieceValue(cards: Card[]): number {
   return cards.reduce((total, card) => total + card.digit * card.place, 0);
 }
 
+// TODO(locale): numbers are always shown in en-US style ("4,325"), and
+// makeNumber only strips commas from typed input. See "Planned work" in the
+// README: this should follow the chosen UI locale once translations exist.
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
 }

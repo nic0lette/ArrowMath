@@ -7,12 +7,15 @@ import {
   boxOf,
   cancelBankDrag,
   card,
+  cardsLayer,
   chrome,
   dragCardBy,
   dragCardFromPoint,
   dragCardToCenter,
   dragCardToEdge,
+  expectInsideCardsLayer,
   gotoApp,
+  gotoSeeded,
   pieceIdFor,
   workbench,
 } from './helpers';
@@ -614,4 +617,75 @@ test('phone layout stays within the viewport and collapses the tray', async ({ p
   await expect(page.getByRole('button', { name: 'Expand card tray' })).toBeVisible();
   await page.getByRole('button', { name: 'Expand card tray' }).click();
   await expect(page.getByRole('button', { name: 'Add Stacked' })).toBeVisible();
+});
+
+test('stacking onto a card at the left edge keeps the whole group on the workbench', async ({
+  page,
+}) => {
+  // The stack grows leftwards from the stationary target, so a 4,000 card
+  // dropped onto a 5 at the left edge used to push its "4" off the canvas.
+  await gotoSeeded(page, [
+    { id: 'ones', cards: [{ id: 'c-ones', place: 1, digit: 5 }], x: 16, y: 300 },
+    { id: 'thousands', cards: [{ id: 'c-thousands', place: 1000, digit: 4 }], x: 480, y: 300 },
+  ]);
+
+  await dragCardToCenter(page, card(page, 1000, 4), card(page, 1, 5));
+
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');
+  const groupId = await pieceIdFor(card(page, 1000, 4));
+  await expect(chrome(page, groupId)).toContainText('4,005');
+  await expectInsideCardsLayer(page, [card(page, 1000, 4), card(page, 1, 5)]);
+});
+
+test('chaining near the right edge keeps the cards and the sum on the workbench', async ({
+  page,
+}) => {
+  await gotoSeeded(page, [
+    { id: 'ones', cards: [{ id: 'c-ones', place: 1, digit: 5 }], x: 300, y: 300 },
+  ]);
+  const layer = await boxOf(cardsLayer(page));
+  // Leave just enough room on the right for the 5 to touch the 4,000's edge.
+  await gotoSeeded(page, [
+    { id: 'ones', cards: [{ id: 'c-ones', place: 1, digit: 5 }], x: 300, y: 300 },
+    {
+      id: 'thousands',
+      cards: [{ id: 'c-thousands', place: 1000, digit: 4 }],
+      x: Math.round(layer.width - 16 - 260 - 90),
+      y: 300,
+    },
+  ]);
+
+  await dragCardToEdge(page, card(page, 1, 5), card(page, 1000, 4), 12);
+
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');
+  const groupId = await pieceIdFor(card(page, 1000, 4));
+  await expect(chrome(page, groupId)).toHaveAttribute('data-mode', 'expand');
+  await expect(page.locator('.equation-result')).toContainText('4,005');
+  await expectInsideCardsLayer(page, [
+    card(page, 1000, 4),
+    card(page, 1, 5),
+    page.locator('.equation-result'),
+  ]);
+});
+
+test('opening the card tray pulls cards near the bottom back into view', async ({ page }) => {
+  await gotoSeeded(page, [], { bankOpen: false });
+  const layer = await boxOf(cardsLayer(page));
+  await gotoSeeded(
+    page,
+    [
+      {
+        id: 'tens',
+        cards: [{ id: 'c-tens', place: 10, digit: 3 }],
+        x: 200,
+        y: Math.round(layer.height - 16 - 68),
+      },
+    ],
+    { bankOpen: false },
+  );
+
+  await page.getByRole('button', { name: 'Expand card tray' }).click();
+  await expect(page.getByRole('button', { name: 'Collapse card tray' })).toBeVisible();
+
+  await expectInsideCardsLayer(page, [card(page, 10, 3)]);
 });

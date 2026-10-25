@@ -115,6 +115,15 @@ tests/
 - **Themes, preferences and _the lesson itself_** are stored in `localStorage`: mute, grid snapping, tray state, and the whole workbench (pieces, positions and stacking order) survive a page refresh, clamped to fit whatever screen size is found. A teacher clearing the canvas and refreshing stays cleared.
 - **Responsive.** The workbench shrinks, the card tray collapses by default on phones, and bank rows scroll with accessible arrow buttons. The teacher guide becomes a scrollable native `<dialog>`.
 
+## Planned work
+
+- **Locales and translations.** Numbers are currently always formatted in
+  en-US style (`formatNumber` in `src/lib/geometry.ts`), and the "Make a
+  number" field only strips commas from typed input. Doing this properly means
+  adding translations for the UI text, a locale picker in the toolbar, and
+  defaulting to the browser's locale when it is one we support. Number
+  formatting and input parsing should then follow the chosen locale.
+
 ## Arrow card integration
 
 The app imports the internal library through the bare package name:

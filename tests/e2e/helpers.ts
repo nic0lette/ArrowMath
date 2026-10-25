@@ -165,3 +165,87 @@ export async function pieceIdFor(locator: Locator): Promise<string> {
 export function chrome(page: Page, pieceId: string): Locator {
   return page.locator(`.piece-chrome[data-piece-id="${pieceId}"]`);
 }
+
+export interface SeedCard {
+  id: string;
+  place: number;
+  digit: number;
+}
+
+export interface SeedPiece {
+  id: string;
+  cards: SeedCard[];
+  x: number;
+  y: number;
+  mode?: 'stack' | 'expand';
+}
+
+/**
+ * Opens the app with a saved board (and optional preferences) already in
+ * storage, so a test can start with cards at exact positions such as the
+ * workbench edges. Each call seeds exactly once, before the app loads, so a
+ * test can load once to measure the canvas and then seed again.
+ */
+let seedCount = 0;
+
+export async function gotoSeeded(
+  page: Page,
+  pieces: SeedPiece[],
+  preferences?: Record<string, unknown>,
+): Promise<void> {
+  seedCount += 1;
+  const flag = `arrow-math:test-seeded-${seedCount}`;
+  await page.addInitScript(
+    ([pieces, preferences, flag]) => {
+      if (sessionStorage.getItem(flag)) return;
+      sessionStorage.setItem(flag, '1');
+      localStorage.setItem(
+        'arrow-math:workbench',
+        JSON.stringify({
+          version: 1,
+          pieces: pieces.map((piece, index) => ({ mode: 'stack', z: index + 1, ...piece })),
+        }),
+      );
+      if (preferences) localStorage.setItem('arrow-math:preferences', JSON.stringify(preferences));
+    },
+    [pieces, preferences, flag] as const,
+  );
+  await page.goto('/');
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', String(pieces.length));
+}
+
+/** The card layer is the coordinate system pieces are clamped to. */
+export function cardsLayer(page: Page): Locator {
+  return page.locator('.cards-layer');
+}
+
+/**
+ * Waits until the boxes have stopped moving and then checks that every one is
+ * fully inside the card layer. Checking before a spring settles can pass on
+ * the drop position and miss where the card actually comes to rest.
+ */
+export async function expectInsideCardsLayer(page: Page, targets: Locator[]): Promise<void> {
+  const measure = () => Promise.all(targets.map((target) => boxOf(target)));
+  await expect
+    .poll(async () => {
+      const before = await measure();
+      await page.waitForTimeout(150);
+      const boxes = await measure();
+      const settled = boxes.every(
+        (box, index) =>
+          Math.abs(box.x - before[index].x) < 0.5 && Math.abs(box.y - before[index].y) < 0.5,
+      );
+      if (!settled) return 'moving';
+
+      const layer = await boxOf(cardsLayer(page));
+      const inside = boxes.every(
+        (box) =>
+          box.x >= layer.x - 0.5 &&
+          box.y >= layer.y - 0.5 &&
+          box.x + box.width <= layer.x + layer.width + 0.5 &&
+          box.y + box.height <= layer.y + layer.height + 0.5,
+      );
+      return inside ? 'inside' : 'outside';
+    })
+    .toBe('inside');
+}
