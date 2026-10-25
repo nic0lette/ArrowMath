@@ -30,21 +30,6 @@
         game.hoveredId === piece.id ||
         keepChromeForChromeDrag),
   );
-  const moveIntent = $derived(
-    piece.cards.length > 1 &&
-      game.intent?.kind === 'move' &&
-      game.intent.pieceId === piece.id,
-  );
-  const groupGlowId = $derived(`group-glow-${piece.id.replace(/[^a-zA-Z0-9_-]/g, '')}`);
-  const groupGlowStops = $derived(
-    layout.cards.map((entry, index) => ({
-      offset:
-        layout.cards.length <= 1
-          ? '0%'
-          : `${(index / (layout.cards.length - 1)) * 100}%`,
-      color: THEMES[game.theme][placeTier(entry.card.place)].accent,
-    })),
-  );
   const belowTop = $derived(piece.y + layout.height + 10);
   const chromeAbove = $derived(piece.y >= 54 || belowTop + 38 > game.canvas.height - 8);
   const chromeTop = $derived(chromeAbove ? Math.max(8, piece.y - 44) : belowTop);
@@ -95,93 +80,6 @@
 </script>
 
 <div class="piece-overlay" class:dragging={isDragging} class:selected={isSelected} style:z-index={overlayZ}>
-  {#if moveIntent}
-    <div
-      class="group-glow"
-      class:expanded={isExpanded}
-      style:left="{piece.x}px"
-      style:top="{piece.y}px"
-      style:width="{layout.width}px"
-      style:height="{layout.height}px"
-      aria-hidden="true"
-    >
-      <svg
-        class="group-glow-ring"
-        width={layout.width}
-        height={layout.height}
-        viewBox="0 0 {layout.width} {layout.height}"
-        aria-hidden="true"
-      >
-        <defs>
-          <linearGradient
-            id={groupGlowId}
-            x1="0"
-            y1="0"
-            x2={layout.width}
-            y2="0"
-            gradientUnits="userSpaceOnUse"
-          >
-            {#each groupGlowStops as stop, index (index)}
-              <stop offset={stop.offset} stop-color={stop.color} />
-            {/each}
-          </linearGradient>
-          <filter
-            id="{groupGlowId}-blur-soft"
-            x="-60%"
-            y="-60%"
-            width="220%"
-            height="220%"
-          >
-            <feGaussianBlur stdDeviation="8" />
-          </filter>
-          <filter
-            id="{groupGlowId}-blur-tight"
-            x="-50%"
-            y="-50%"
-            width="200%"
-            height="200%"
-          >
-            <feGaussianBlur stdDeviation="3" />
-          </filter>
-        </defs>
-        <rect
-          x="-6"
-          y="-6"
-          width={Math.max(0, layout.width + 12)}
-          height={Math.max(0, layout.height + 12)}
-          rx="24"
-          fill="none"
-          stroke="url(#{groupGlowId})"
-          stroke-width="18"
-          opacity="0.32"
-          filter="url(#{groupGlowId}-blur-soft)"
-        />
-        <rect
-          x="-2"
-          y="-2"
-          width={Math.max(0, layout.width + 4)}
-          height={Math.max(0, layout.height + 4)}
-          rx="20"
-          fill="none"
-          stroke="url(#{groupGlowId})"
-          stroke-width="8"
-          opacity="0.22"
-          filter="url(#{groupGlowId}-blur-tight)"
-        />
-        <rect
-          x="0"
-          y="0"
-          width={layout.width}
-          height={layout.height}
-          rx="16"
-          fill="url(#{groupGlowId})"
-          opacity="0.07"
-        />
-      </svg>
-      <span class="group-glow-spine"></span>
-    </div>
-  {/if}
-
   {#if isExpanded}
     {#each layout.operators as operator, index (index)}
       <span
@@ -289,49 +187,6 @@
     inset: 0;
     pointer-events: none;
     transition: z-index 0s;
-  }
-
-  .group-glow {
-    position: absolute;
-    transform-origin: center;
-    color: var(--ink);
-    pointer-events: none;
-    animation: group-glow-in 130ms ease-out;
-  }
-
-  .group-glow-ring {
-    position: absolute;
-    inset: 0;
-    display: block;
-    overflow: visible;
-    pointer-events: none;
-  }
-
-  .group-glow-spine {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    width: 5px;
-    height: 25px;
-    transform: translateY(-50%);
-    border-radius: 999px;
-    background: repeating-linear-gradient(
-      to bottom,
-      currentColor 0 3px,
-      transparent 3px 7px
-    );
-    opacity: 0.38;
-  }
-
-  .group-glow.expanded .group-glow-spine {
-    display: none;
-  }
-
-  @keyframes group-glow-in {
-    from {
-      opacity: 0;
-      transform: scale(0.985);
-    }
   }
 
   .equation-operator {
@@ -577,8 +432,7 @@
       transition: none;
     }
     .equation-operator,
-    .equation-result,
-    .group-glow {
+    .equation-result {
       animation: none;
     }
   }

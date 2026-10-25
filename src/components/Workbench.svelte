@@ -16,6 +16,8 @@
     isBase: boolean;
     grouped: boolean;
     dragging: boolean;
+    covered: boolean;
+    visibleWidth: number;
     spring: ReturnType<typeof springFor>;
   }
 
@@ -27,6 +29,12 @@
       const dragging = game.draggingPieceId === piece.id;
 
       layout.cards.forEach((entry, index) => {
+        // In a stack, every card but the front one is tucked under the next
+        // (smaller) card. Its visible width is the distance to that card's left
+        // edge, which can be wider than one digit slot when places are missing.
+        const covering = piece.mode === 'stack' ? layout.cards[index + 1] : undefined;
+        const visibleWidth = covering ? covering.localX - entry.localX : entry.width;
+
         flat.push({
           card: entry.card,
           pieceId: piece.id,
@@ -37,6 +45,8 @@
           isBase: entry.isBase,
           grouped: piece.cards.length > 1,
           dragging,
+          covered: Boolean(covering),
+          visibleWidth,
           spring: springFor(piece),
         });
       });
@@ -121,6 +131,8 @@
           grouped={entry.grouped}
           xray={game.xray}
           dragging={entry.dragging}
+          covered={entry.covered}
+          visibleWidth={entry.visibleWidth}
           spring={entry.spring}
         />
       {/each}

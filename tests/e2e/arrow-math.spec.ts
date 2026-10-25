@@ -328,9 +328,7 @@ test('expands into a number sentence, stacks again, and toggles x-ray', async ({
   await expect(page.locator('.card-node.show-through')).toHaveCount(3);
 });
 
-test('the digit end previews a pull-out and the arrow side previews a group move', async ({
-  page,
-}) => {
+test('the digit end lifts one card and the arrow side lifts the whole stack', async ({ page }) => {
   await gotoApp(page);
   await addStacked(page, 4325, 4);
   await page.waitForTimeout(350);
@@ -339,29 +337,36 @@ test('the digit end previews a pull-out and the arrow side previews a group move
   const hundredsBox = await boxOf(hundreds);
   await page.mouse.move(hundredsBox.x + 18, hundredsBox.y + 34);
 
-  await expect(page.locator('.card-node[data-place="100"].peel-glow')).toHaveCount(1);
-  await expect(page.locator('.group-glow')).toHaveCount(0);
+  await expect(page.locator('.card-node[data-place="100"].peel-lift')).toHaveCount(1);
+  await expect(page.locator('.card-node.move-intent')).toHaveCount(0);
 
-  // Pressing keeps the group calm and the pull-out glow visible until the
-  // movement threshold is crossed.
+  // A buried card is clipped to the part that is not covered, so its hidden
+  // right-hand side cannot rise through the cards stacked on top of it.
+  const clipPath = await page
+    .locator('.card-node[data-place="100"].peel-lift .card-inner')
+    .evaluate((element) => getComputedStyle(element).clipPath);
+  expect(clipPath).toContain('inset');
+
+  // Pressing keeps the stack calm and the card lifted until the movement
+  // threshold is crossed.
   await page.mouse.down();
   await expect(page.locator('.card-node[data-place="100"]')).toHaveAttribute(
     'data-dragging',
     'false',
   );
-  await expect(page.locator('.card-node[data-place="100"].peel-glow')).toHaveCount(1);
+  await expect(page.locator('.card-node[data-place="100"].peel-lift')).toHaveCount(1);
   await page.mouse.up();
-  await expect(page.locator('.card-node[data-place="100"].peel-glow')).toHaveCount(1);
+  await expect(page.locator('.card-node[data-place="100"].peel-lift')).toHaveCount(1);
 
   const ones = card(page, 1, 5);
   const onesBox = await boxOf(ones);
   await page.mouse.move(onesBox.x + onesBox.width - 10, onesBox.y + 34);
 
-  await expect(page.locator('.card-node.peel-glow')).toHaveCount(0);
-  await expect(page.locator('.group-glow')).toHaveCount(1);
+  await expect(page.locator('.card-node.peel-lift')).toHaveCount(0);
+  await expect(page.locator('.card-node.move-intent')).toHaveCount(4);
 
   await page.mouse.move(24, 300);
-  await expect(page.locator('.group-glow')).toHaveCount(0);
+  await expect(page.locator('.card-node.move-intent')).toHaveCount(0);
 });
 
 test('pulling a card out of the digit end closes the group and updates its value', async ({
@@ -413,7 +418,7 @@ test('dragging the arrow spine moves the whole group', async ({ page }) => {
   await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');
   await expect(workbench(page)).toHaveAttribute('data-card-count', '4');
   await expect(chrome(page, groupId)).toContainText('4,325');
-  await expect(page.locator('.group-glow')).toHaveCount(1);
+  await expect(page.locator('.card-node.move-intent')).toHaveCount(4);
   expect(await pieceIdFor(ones)).toBe(groupId);
 
   const after = await boxOf(ones);
@@ -443,7 +448,7 @@ test('dragging the number chip moves the group and keeps the chrome visible', as
   await page.mouse.up();
 
   await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');
-  await expect(page.locator('.group-glow')).toHaveCount(1);
+  await expect(page.locator('.card-node.move-intent')).toHaveCount(4);
   const after = await boxOf(card(page, 1, 5));
   expect(after.x - before.x).toBeGreaterThan(30);
   expect(after.y - before.y).toBeGreaterThan(10);
@@ -511,7 +516,7 @@ test('clicking a single card does not nudge it', async ({ page }) => {
   await expect(workbench(page)).toHaveAttribute('data-card-count', '1');
 });
 
-test('a single card has no pull-out glow and still drags normally', async ({ page }) => {
+test('a single card has no pull-out lift and still drags normally', async ({ page }) => {
   await gotoApp(page);
   await addBankCard(page, 1, 9);
   await page.waitForTimeout(300);
@@ -520,8 +525,8 @@ test('a single card has no pull-out glow and still drags normally', async ({ pag
   const box = await boxOf(nine);
   await page.mouse.move(box.x + 18, box.y + 34);
 
-  await expect(page.locator('.peel-glow')).toHaveCount(0);
-  await expect(page.locator('.group-glow')).toHaveCount(0);
+  await expect(page.locator('.peel-lift')).toHaveCount(0);
+  await expect(page.locator('.move-intent')).toHaveCount(0);
 
   await dragCardBy(page, nine, 80, 40);
   await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');

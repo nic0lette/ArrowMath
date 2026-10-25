@@ -1060,8 +1060,8 @@ class ArrowMathStore {
       this.endPieceDrag();
 
       // A mouse pointer is still resting on the card after the drop, so its
-      // aim glow should stay. A lifted finger is not hovering anything, and
-      // re-checking elementFromPoint would leave a stuck glow behind it.
+      // aim lift should stay. A lifted finger is not hovering anything, and
+      // re-checking elementFromPoint would leave a stuck lift behind it.
       if (event.pointerType === 'touch') return;
 
       const { clientX, clientY } = event;

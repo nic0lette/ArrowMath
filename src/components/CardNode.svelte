@@ -1,6 +1,6 @@
 <script lang="ts">
   import ArrowCard from 'arrow-cards/svelte';
-  import { THEMES, getArrowCardWidth, type ColorTheme } from 'arrow-cards';
+  import { getArrowCardWidth, type ColorTheme } from 'arrow-cards';
   import { cardMotion, type SpringConfig } from '../lib/cardMotion';
   import { game } from '../lib/state.svelte';
   import { isPeelZone, placeTier, type Card, type PieceMode } from '../lib/geometry';
@@ -17,6 +17,8 @@
     grouped: boolean;
     xray: boolean;
     dragging: boolean;
+    covered: boolean;
+    visibleWidth: number;
     spring: SpringConfig;
   }
 
@@ -32,6 +34,8 @@
     grouped,
     xray,
     dragging,
+    covered,
+    visibleWidth,
     spring,
   }: Props = $props();
 
@@ -39,13 +43,31 @@
   const showThrough = $derived(xray && mode === 'stack' && !isBase);
   const elId = $derived(`card-${card.id.replace(/[^a-zA-Z0-9_-]/g, '')}`);
   const value = $derived(card.digit * card.place);
-  const accent = $derived(THEMES[theme][placeTier(card.place)].accent);
-  const peelGlow = $derived(
+  const peelLift = $derived(
     grouped && game.intent?.kind === 'peel' && game.intent.cardId === card.id,
   );
   const moveIntent = $derived(
     grouped && game.intent?.kind === 'move' && game.intent.pieceId === pieceId,
   );
+  // Leave a few pixels of the hidden part under the covering card so the cut
+  // edge stays tucked away instead of peeking through its rounded corners.
+  const liftClip = $derived(Math.min(width, visibleWidth + 8));
+
+  // Hold the clip for the length of the settle so a card leaving the aim state
+  // cannot flash its hidden portion above the cards on top of it.
+  let clipHold = $state(false);
+  $effect(() => {
+    if (peelLift) {
+      clipHold = true;
+      return;
+    }
+    if (!clipHold) return;
+    const timer = setTimeout(() => {
+      clipHold = false;
+    }, 200);
+    return () => clearTimeout(timer);
+  });
+  const liftClipped = $derived(covered && clipHold);
   const placeTierName = $derived(placeTier(card.place));
   const actionLabel = $derived(
     !grouped
@@ -63,7 +85,7 @@
   }
 
   function updateIntent(event: PointerEvent) {
-    // Touch has no hover phase. Showing the mouse-only aim glow while a finger
+    // Touch has no hover phase. Showing the mouse-only aim lift while a finger
     // rests on a card leaves it stuck on afterwards.
     if (event.pointerType === 'touch' || game.isInteracting) return;
     const kind = intentFor(event);
@@ -106,12 +128,13 @@
   class="card-node"
   class:dragging
   class:show-through={showThrough}
-  class:peel-glow={peelGlow}
+  class:peel-lift={peelLift}
+  class:lift-clipped={liftClipped}
   class:move-intent={moveIntent}
   style:z-index={z}
   style:width="{width}px"
   style:height="68px"
-  style:--card-glow={accent}
+  style:--card-lift-clip="{liftClip}px"
   use:cardMotion={{ x, y, immediate: dragging, spring }}
   role="button"
   tabindex="0"
@@ -181,36 +204,32 @@
   }
 
   .card-node:not(.dragging):hover .card-inner {
-    transform: translateY(-3px);
-    filter: drop-shadow(0 9px 12px rgba(15, 23, 42, 0.12));
+    transform: translateY(-4px);
+    filter: drop-shadow(0 10px 12px rgba(15, 23, 42, 0.14));
   }
 
-  /* Aiming at the flat, leading-digit end: only this card will come out. */
-  .card-node.peel-glow:not(.dragging) .card-inner {
-    transform: translateY(-3px) scale(1.006);
+  /* Aiming at the flat, leading-digit end: this card alone lifts. A card that
+     is buried in a stack is clipped to its exposed part, so it slides up from
+     under the cards on top rather than rising through them. */
+  .card-node.peel-lift:not(.dragging) .card-inner {
+    transform: translateY(-5px);
     filter:
-      drop-shadow(0 0 2px color-mix(in srgb, var(--card-glow) 85%, transparent))
-      drop-shadow(0 0 10px color-mix(in srgb, var(--card-glow) 55%, transparent))
-      drop-shadow(0 0 24px color-mix(in srgb, var(--card-glow) 28%, transparent));
+      drop-shadow(0 10px 10px rgba(15, 23, 42, 0.16))
+      drop-shadow(0 2px 3px rgba(15, 23, 42, 0.1));
+    transition:
+      transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 220ms ease,
+      filter 180ms ease;
   }
 
-  .card-node.peel-glow:not(.dragging) .card-inner::after {
-    content: '';
-    position: absolute;
-    left: 4px;
-    top: 15px;
-    bottom: 15px;
-    width: 4px;
-    border-radius: 999px;
-    background: var(--card-glow);
-    box-shadow: 0 0 9px color-mix(in srgb, var(--card-glow) 70%, transparent);
-    pointer-events: none;
+  .card-node.lift-clipped:not(.dragging) .card-inner {
+    clip-path: inset(-16px calc(100% - var(--card-lift-clip)) -18px -16px);
   }
 
-  /* Aiming at the arrow side: the whole group will move, not this card. */
-  .card-node.move-intent:not(.dragging):hover .card-inner {
-    transform: none;
-    filter: none;
+  /* Aiming at the arrow side: the whole group lifts as one object. */
+  .card-node.move-intent:not(.dragging) .card-inner {
+    transform: translateY(-4px);
+    filter: drop-shadow(0 10px 12px rgba(15, 23, 42, 0.16));
   }
 
   /* Soften the internal card outlines so the stack reads as one object. */
@@ -265,10 +284,6 @@
   @media (prefers-reduced-motion: reduce) {
     .card-inner {
       transition: none;
-    }
-    .card-node:not(.dragging):hover .card-inner,
-    .card-node.peel-glow:not(.dragging) .card-inner {
-      transform: none;
     }
     .card-node.move-intent :global(.arrow-card-svg > path:first-of-type) {
       transition: none;

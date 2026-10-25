@@ -148,7 +148,7 @@ test('the front of a stack can be grabbed just beyond the arrow tip', async ({ p
   await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');
 });
 
-test('lifting a finger leaves no hover aim-glow behind', async ({ page }) => {
+test('lifting a finger leaves no hover aim state behind', async ({ page }) => {
   await gotoApp(page);
   await addStacked(page, 4325, 4);
   await page.waitForTimeout(300);
@@ -158,11 +158,11 @@ test('lifting a finger leaves no hover aim-glow behind', async ({ page }) => {
   if (!box) throw new Error('Card has no box');
 
   // A tap commits the selection, then the lifted touch used to re-check the
-  // element under the finger and leave a peel/group glow stuck on.
+  // element under the finger and leave a peel/group lift stuck on.
   await touchTap(page, box.x + box.width / 2, box.y + box.height / 2);
 
-  await expect(page.locator('.peel-glow')).toHaveCount(0);
-  await expect(page.locator('.group-glow')).toHaveCount(0);
+  await expect(page.locator('.peel-lift')).toHaveCount(0);
+  await expect(page.locator('.move-intent')).toHaveCount(0);
   await expect(workbench(page)).toHaveAttribute('data-card-count', '4');
 });
 
