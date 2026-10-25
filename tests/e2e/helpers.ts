@@ -249,3 +249,9 @@ export async function expectInsideCardsLayer(page: Page, targets: Locator[]): Pr
     })
     .toBe('inside');
 }
+
+/** Selects a card's piece from the keyboard, which shows that piece's toolbar. */
+export async function selectPieceOf(page: Page, source: Locator): Promise<void> {
+  await source.focus();
+  await page.keyboard.press('Enter');
+}

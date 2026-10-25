@@ -21,14 +21,13 @@
   const isDragging = $derived(game.draggingPieceId === piece.id);
   const isSelected = $derived(game.selectedId === piece.id);
   const keepChromeForChromeDrag = $derived(game.draggingFromChrome && isDragging);
+  // The toolbar is how the selection shows, so only the selected piece gets
+  // one. Hover alone would put a second toolbar on another group.
   const showChrome = $derived(
     (!game.isInteracting || keepChromeForChromeDrag) &&
       (!isDragging || keepChromeForChromeDrag) &&
       piece.spring !== 'bounce' &&
-      (piece.cards.length > 1 ||
-        isSelected ||
-        game.hoveredId === piece.id ||
-        keepChromeForChromeDrag),
+      (isSelected || keepChromeForChromeDrag),
   );
   const belowTop = $derived(piece.y + layout.height + 10);
   const chromeAbove = $derived(piece.y >= 54 || belowTop + 38 > game.canvas.height - 8);

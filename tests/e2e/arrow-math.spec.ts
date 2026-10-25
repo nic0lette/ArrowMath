@@ -17,6 +17,7 @@ import {
   gotoApp,
   gotoSeeded,
   pieceIdFor,
+  selectPieceOf,
   workbench,
 } from './helpers';
 
@@ -392,6 +393,8 @@ test('pulling a card out of the digit end closes the group and updates its value
 
   await expect(workbench(page)).toHaveAttribute('data-piece-count', '2');
   await expect(workbench(page)).toHaveAttribute('data-card-count', '4');
+  // The pulled-out card is now the selection; select the group to read it.
+  await selectPieceOf(page, card(page, 1000, 4));
   await expect(groupChrome).toHaveAttribute('data-mode', 'stack');
   await expect(groupChrome).toContainText('4,025');
 
@@ -499,6 +502,7 @@ test('an expanded card can be pulled out from anywhere on the card', async ({ pa
   await dragCardFromPoint(page, hundreds, box.width - 20, 34, 140, 150);
 
   await expect(workbench(page)).toHaveAttribute('data-piece-count', '2');
+  await selectPieceOf(page, card(page, 1000, 4));
   await expect(groupChrome).toHaveAttribute('data-mode', 'expand');
   await expect(groupChrome).toContainText('4,025');
 });
@@ -585,6 +589,7 @@ test('the workbench survives a page reload', async ({ page }) => {
   // The restored group is still the same stacked 4,325 group, sitting where it
   // was left thanks to the persisted coordinates.
   const groupId = await pieceIdFor(card(page, 1000, 4));
+  await selectPieceOf(page, card(page, 1000, 4));
   await expect(chrome(page, groupId)).toContainText('4,325');
   await expect(chrome(page, groupId)).toHaveAttribute('data-mode', 'stack');
 
@@ -688,4 +693,52 @@ test('opening the card tray pulls cards near the bottom back into view', async (
   await expect(page.getByRole('button', { name: 'Collapse card tray' })).toBeVisible();
 
   await expectInsideCardsLayer(page, [card(page, 10, 3)]);
+});
+
+test('only the selected piece shows its toolbar', async ({ page }) => {
+  await gotoSeeded(page, [
+    {
+      id: 'left',
+      cards: [
+        { id: 'c-thousands', place: 1000, digit: 4 },
+        { id: 'c-hundreds', place: 100, digit: 3 },
+      ],
+      x: 96,
+      y: 240,
+    },
+    {
+      id: 'right',
+      cards: [
+        { id: 'c-tens', place: 10, digit: 2 },
+        { id: 'c-ones', place: 1, digit: 5 },
+      ],
+      x: 720,
+      y: 240,
+    },
+  ]);
+  const toolbars = page.locator('.piece-chrome');
+
+  // Nothing is selected after a reload, so no group shows its toolbar.
+  await expect(toolbars).toHaveCount(0);
+
+  await selectPieceOf(page, card(page, 100, 3));
+  await expect(toolbars).toHaveCount(1);
+  await expect(chrome(page, 'left')).toContainText('4,300');
+
+  // Hovering another group does not show a second toolbar.
+  // The tens card is mostly covered by the ones card; aim at its digit end.
+  await card(page, 10, 2).hover({ position: { x: 12, y: 34 } });
+  await page.waitForTimeout(300);
+  await expect(toolbars).toHaveCount(1);
+  await expect(chrome(page, 'left')).toBeVisible();
+
+  // Clicking another group moves the selection, and its toolbar, there.
+  await card(page, 1, 5).click();
+  await expect(toolbars).toHaveCount(1);
+  await expect(chrome(page, 'right')).toContainText('25');
+
+  // Clicking empty workbench clears the selection.
+  const layer = await boxOf(cardsLayer(page));
+  await page.mouse.click(layer.x + layer.width / 2, layer.y + layer.height - 40);
+  await expect(toolbars).toHaveCount(0);
 });
