@@ -742,3 +742,55 @@ test('only the selected piece shows its toolbar', async ({ page }) => {
   await page.mouse.click(layer.x + layer.width / 2, layer.y + layer.height - 40);
   await expect(toolbars).toHaveCount(0);
 });
+
+test('tapping tray cards builds onto the selected number and swaps a taken place', async ({
+  page,
+}) => {
+  await gotoApp(page);
+
+  // Tapping with nothing selected adds a new card, which becomes the selection.
+  await bankCard(page, 1000, 4).click();
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');
+  const groupId = await pieceIdFor(card(page, 1000, 4));
+
+  await bankCard(page, 10, 1).click();
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');
+  await expect(workbench(page)).toHaveAttribute('data-card-count', '2');
+  await expect(chrome(page, groupId)).toContainText('4,010');
+
+  // A tap on a taken place swaps the card instead of bouncing.
+  await bankCard(page, 10, 3).click();
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');
+  await expect(workbench(page)).toHaveAttribute('data-card-count', '2');
+  await expect(chrome(page, groupId)).toContainText('4,030');
+  await expect(card(page, 10, 1)).toHaveCount(0);
+  await expect(page.getByText(/already has a card/)).toHaveCount(0);
+  await expectInsideCardsLayer(page, [card(page, 1000, 4), card(page, 10, 3)]);
+
+  // With nothing selected, a tap starts a separate number again.
+  await page.keyboard.press('Escape');
+  await bankCard(page, 1, 5).click();
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', '2');
+  expect(await pieceIdFor(card(page, 1, 5))).not.toBe(groupId);
+});
+
+test('dragging a tray card onto a taken place still bounces it out', async ({ page }) => {
+  await gotoApp(page);
+  await bankCard(page, 1000, 4).click();
+  await bankCard(page, 10, 1).click();
+  const groupId = await pieceIdFor(card(page, 1000, 4));
+  await expect(chrome(page, groupId)).toContainText('4,010');
+
+  // The group is still selected, but a drag follows the normal overlap rules.
+  const target = await boxOf(card(page, 10, 1));
+  await beginBankDrag(page, 10, 3);
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 12 });
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', '2');
+  await expect(workbench(page)).toHaveAttribute('data-card-count', '3');
+  await expect(page.getByText(/already has a card/)).toBeVisible();
+  expect(await pieceIdFor(card(page, 10, 3))).not.toBe(groupId);
+  expect(await pieceIdFor(card(page, 10, 1))).toBe(groupId);
+});

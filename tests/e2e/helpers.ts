@@ -19,7 +19,15 @@ export async function gotoApp(page: Page): Promise<void> {
   await expect(workbench(page)).toHaveAttribute('data-piece-count', '0');
 }
 
+/**
+ * Adds a tray card as its own new piece. A tap on the tray joins whatever is
+ * selected, so this clears the selection first, as a teacher starting a new
+ * number would.
+ */
 export async function addBankCard(page: Page, place: number, digit: number): Promise<void> {
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.piece-chrome')).toHaveCount(0);
+
   const beforePieces = Number(await workbench(page).getAttribute('data-piece-count'));
   const beforeCards = Number(await workbench(page).getAttribute('data-card-count'));
 

@@ -500,8 +500,9 @@ class ArrowMathStore {
       active: false,
       overCanvas: false,
     };
+    // The selection stays: if this press turns out to be a tap, the card
+    // joins the selected piece (see addBankCard).
     this.hover = null;
-    this.selectedId = null;
     this.hoveredId = null;
     this.intent = null;
     this.lastPointerDown = null;
@@ -557,9 +558,22 @@ class ArrowMathStore {
     this.hover = this.haloFor(candidate);
   }
 
+  /**
+   * A tap (or keyboard press) on a tray card. With a piece selected the card
+   * joins it, swapping out any card already in that place so 4,010 and a
+   * tapped 30 make 4,030. Otherwise it lands in free space and becomes the
+   * selection, so successive taps build one number. Drags never swap: they
+   * keep the bounce rule in dropBankCard.
+   */
   addBankCard(card: BankCardSource): Piece {
     this.measureCanvas();
     const incoming = makeCard(card.place, card.digit);
+    const selected = this.selectedPiece;
+    if (selected) {
+      this.addCardToPiece(selected, incoming);
+      return selected;
+    }
+
     const layout = layoutPiece([incoming], 'stack');
     const spot = findFreeSpot({
       width: layout.width,
@@ -573,6 +587,29 @@ class ArrowMathStore {
     this.hoveredId = piece.id;
     audio.add();
     return piece;
+  }
+
+  private addCardToPiece(target: Piece, incoming: Card): void {
+    const kept = target.cards.filter((card) => card.place !== incoming.place);
+    const replaced = kept.length < target.cards.length;
+    const merged = mergeCards(kept, [incoming]);
+    const position = getMergedPosition(target, merged, target.mode);
+
+    target.cards = merged;
+    target.x = position.x;
+    target.y = position.y;
+    this.applySpring(target, 'default');
+    this.fitPieceInCanvas(target);
+    this.bringToFront(target);
+    this.hoveredId = target.id;
+    this.intent = null;
+    this.lastPointerDown = null;
+
+    if (replaced) {
+      audio.peel();
+    } else {
+      audio.snap();
+    }
   }
 
   private dropBankCard(drag: BankDragState, clientX: number, clientY: number): void {
