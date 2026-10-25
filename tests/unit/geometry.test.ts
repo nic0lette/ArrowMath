@@ -129,6 +129,16 @@ describe('overlap and drop detection', () => {
     expect(stack?.overlapX).toBe(40);
   });
 
+  it('joins an expanded group as a chain however far the card overlaps', () => {
+    const expanded = piece('target', [card(1000, 4), card(10, 2)], 0, 0, 'expand');
+    const deep = findDropCandidate([card(100, 3)], { x: 100, y: 0, width: 202, height: 68 }, [expanded]);
+    const duplicate = findDropCandidate([card(10, 7)], { x: 100, y: 0, width: 144, height: 68 }, [expanded]);
+
+    expect(deep?.overlapX).toBeGreaterThan(100);
+    expect(deep?.kind).toBe('chain');
+    expect(duplicate?.kind).toBe('conflict');
+  });
+
   it('treats a duplicate place as a conflict even at the edge', () => {
     const target = piece('target', [card(100, 4), card(10, 2), card(1, 5)], 0, 0);
     const incoming = [card(10, 5)];

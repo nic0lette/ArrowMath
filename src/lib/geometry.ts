@@ -224,7 +224,8 @@ export function isPeelZone(clientX: number, cardLeft: number): boolean {
 /**
  * Strict 2D AABB detection. A target is only considered when both axes
  * intersect by at least 10px. Substantial horizontal overlap stacks the
- * cards; a shallow edge overlap builds an expanded chain instead.
+ * cards; a shallow edge overlap builds an expanded chain instead. A group that
+ * is already expanded always gains the card as part of its chain.
  */
 export function findDropCandidate(
   cards: Card[],
@@ -243,9 +244,13 @@ export function findDropCandidate(
     if (overlap.x < SNAP_MIN_OVERLAP || overlap.y < SNAP_MIN_OVERLAP) continue;
 
     const conflict = sharesPlace(cards, target.cards);
+    // An expanded group stays expanded: any card that joins it joins the
+    // number sentence, however far it overlaps.
+    const expanded = target.mode === 'expand' && target.cards.length > 1;
     const stack =
-      overlap.x >= STACK_MIN_OVERLAP ||
-      overlap.x > STACK_RATIO * Math.min(draggedBounds.width, targetBounds.width);
+      !expanded &&
+      (overlap.x >= STACK_MIN_OVERLAP ||
+        overlap.x > STACK_RATIO * Math.min(draggedBounds.width, targetBounds.width));
     const kind: DropKind = conflict ? 'conflict' : stack ? 'stack' : 'chain';
 
     const candidate: DropCandidate = {

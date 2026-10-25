@@ -58,7 +58,7 @@ Unit tests live in `tests/unit/`; browser tests and drag helpers live in `tests/
 - **Move a group** — drag the arrow side/spine of a stack, or drag the number chip in the group toolbar.
 - **Touch edges to chain** — a shallow edge overlap (10–27px) builds an expanded number sentence with `+` operators and a result.
 - **Same place bounces** — a place-value column can only hold one card. Drop a duplicate and the stationary group stays anchored while the incoming card springs into nearby clear space.
-- **Expand / Stack** — use the small group toolbar above a stack to spring it open into `4,000 + 300 + 20 + 5 = 4,325`, then stack it back up. Double-click a group to toggle the same way. Once expanded, dragging any card pulls it out.
+- **Expand / Stack** — use the small group toolbar above a stack to spring it open into `4,000 + 300 + 20 + 5 = 4,325`, then stack it back up. Double-click a group to toggle the same way. Once expanded, dragging any card pulls it out, and a card dropped onto the group joins the number sentence instead of stacking it.
 - **Number words** — turn on Words (the eye button) to write every card and group's value in words just under its cards, e.g. 4,325 reads "Four thousand three hundred twenty-five". Near the bottom edge the words move above the cards. The choice is remembered.
 - **Make a number** — type a target such as `4325` and add it as separate cards or as one stacked group.
 - **Classroom tools** — switch curricula, toggle grid snapping, tidy every card into rows, mute the procedural sound, clear the canvas (with undo), or open the teacher guide.

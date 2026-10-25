@@ -834,3 +834,38 @@ test('dragging a tray card onto a taken place still bounces it out', async ({ pa
   expect(await pieceIdFor(card(page, 10, 3))).not.toBe(groupId);
   expect(await pieceIdFor(card(page, 10, 1))).toBe(groupId);
 });
+
+test('a card dropped onto an expanded number joins it and stays expanded', async ({ page }) => {
+  await gotoApp(page);
+  await addStacked(page, 4325, 4);
+  const groupId = await pieceIdFor(card(page, 1000, 4));
+  await chrome(page, groupId).getByRole('button', { name: 'Expand' }).click();
+  await expect(chrome(page, groupId)).toHaveAttribute('data-mode', 'expand');
+  await page.waitForTimeout(500);
+
+  // Pull the 300 out, well away from the group.
+  await dragCardFromPoint(page, card(page, 100, 3), 40, 34, 0, 200);
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', '2');
+  await page.waitForTimeout(400);
+
+  // Drop it deep onto the thousands card: a big overlap that would stack two
+  // loose cards. The halo promises a chain, and the number stays expanded.
+  const thousands = await boxOf(card(page, 1000, 4));
+  const hundreds = await boxOf(card(page, 100, 3));
+  await dragCardFromPoint(
+    page,
+    card(page, 100, 3),
+    40,
+    34,
+    thousands.x + 60 - hundreds.x,
+    thousands.y - hundreds.y,
+    false,
+  );
+  await expect(page.locator('.halo-label')).toContainText('Chain Together');
+  await page.mouse.up();
+
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', '1');
+  await expect(chrome(page, groupId)).toHaveAttribute('data-mode', 'expand');
+  await expect(page.locator('.equation-operator')).toHaveCount(3);
+  await expect(page.locator('.equation-result')).toContainText('4,325');
+});
