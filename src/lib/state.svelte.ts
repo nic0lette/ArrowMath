@@ -107,7 +107,7 @@ interface Preferences {
   theme: ColorTheme;
   muted: boolean;
   snapToGrid: boolean;
-  xray: boolean;
+  words: boolean;
   bankOpen: boolean;
 }
 
@@ -125,7 +125,7 @@ function readPreferences(): Partial<Preferences> {
     if (typeof raw.theme === 'string' && (THEME_KEYS as string[]).includes(raw.theme)) {
       prefs.theme = raw.theme as ColorTheme;
     }
-    for (const key of ['muted', 'snapToGrid', 'xray', 'bankOpen'] as const) {
+    for (const key of ['muted', 'snapToGrid', 'words', 'bankOpen'] as const) {
       if (typeof raw[key] === 'boolean') prefs[key] = raw[key];
     }
     return prefs;
@@ -198,7 +198,8 @@ class ArrowMathStore {
   theme = $state<ColorTheme>('curriculum');
   muted = $state(false);
   snapToGrid = $state(true);
-  xray = $state(false);
+  /** Shows each piece's value in words under its cards. */
+  showWords = $state(false);
   bankOpen = $state(true);
   guideOpen = $state(false);
   bankDrag = $state<BankDragState | null>(null);
@@ -230,7 +231,7 @@ class ArrowMathStore {
     if (prefs.theme) this.theme = prefs.theme;
     this.muted = prefs.muted ?? false;
     this.snapToGrid = prefs.snapToGrid ?? true;
-    this.xray = prefs.xray ?? false;
+    this.showWords = prefs.words ?? false;
     const roomyScreen =
       typeof window === 'undefined' || (window.innerWidth >= 760 && window.innerHeight >= 680);
     this.bankOpen = prefs.bankOpen ?? roomyScreen;
@@ -357,7 +358,7 @@ class ArrowMathStore {
       theme: this.theme,
       muted: this.muted,
       snapToGrid: this.snapToGrid,
-      xray: this.xray,
+      words: this.showWords,
       bankOpen: this.bankOpen,
     });
   }
@@ -1424,22 +1425,10 @@ class ArrowMathStore {
     audio.click();
   }
 
-  toggleXray(): void {
-    this.xray = !this.xray;
+  toggleWords(): void {
+    this.showWords = !this.showWords;
     this.persist();
     audio.click();
-
-    if (this.xray) {
-      const hasStack = this.pieces.some(
-        (piece) => piece.mode === 'stack' && piece.cards.length > 1,
-      );
-      if (!hasStack) {
-        this.notify(
-          'X-ray only reveals zeros in a stacked group. Snap two or more cards together first.',
-          'info',
-        );
-      }
-    }
   }
 
   toggleMute(): void {

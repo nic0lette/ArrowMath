@@ -1,11 +1,11 @@
 <script lang="ts">
   import ArrowCard from 'arrow-cards/svelte';
   import { game } from '../lib/state.svelte';
-  import { layoutPiece, type Card, type PieceMode } from '../lib/geometry';
+  import { layoutPiece, numberToWords, type Card, type PieceMode } from '../lib/geometry';
 
   let dialogEl: HTMLDialogElement | undefined = $state();
   let demoMode = $state<PieceMode>('stack');
-  let peek = $state(false);
+  let showDemoWords = $state(false);
 
   const demoCards: Card[] = [
     { id: 'guide-thousands', place: 1000, digit: 4 },
@@ -92,9 +92,9 @@
                 onclick={() => (demoMode = 'expand')}
               >Expanded</button>
             </div>
-            <label class="peek-toggle" class:disabled={demoMode === 'expand'}>
-              <input type="checkbox" bind:checked={peek} disabled={demoMode === 'expand'} />
-              <span>X-ray zeros</span>
+            <label class="words-toggle">
+              <input type="checkbox" bind:checked={showDemoWords} />
+              <span>Number words</span>
             </label>
           </div>
         </div>
@@ -105,10 +105,8 @@
               {#each demoLayout.cards as entry (entry.card.id)}
                 <div
                   class="demo-arrow"
-                  class:peek={peek && demoMode === 'stack' && !entry.isBase}
                   style:left="{entry.localX * scale}px"
                   style:width="{entry.width * scale}px"
-                  style:opacity={peek && demoMode === 'stack' && !entry.isBase ? 0.88 : 1}
                 >
                   <div
                     style:width="{entry.width}px"
@@ -121,7 +119,6 @@
                       theme={game.theme}
                       idPrefix="guide-{entry.card.id}"
                       className="guide-demo-card"
-                      showZeroGhost={peek && demoMode === 'stack' && !entry.isBase}
                     />
                   </div>
                 </div>
@@ -142,17 +139,15 @@
               <span class="demo-equals">=</span> 4,325
             </span>
           </div>
+          {#if showDemoWords}
+            <p class="demo-words">{numberToWords(4325)}</p>
+          {/if}
         </div>
 
         <p class="demo-caption">
           {#if demoMode === 'stack'}
-            {#if peek}
-              X-ray is on: the card fills become see-through so the covered zeros underneath show
-              through. The visible digits still read 4,325.
-            {:else}
-              The arrow tips align on the right. Each smaller card sits over the zeros beneath it,
-              so the stack reads as 4,325.
-            {/if}
+            The arrow tips align on the right. Each smaller card sits over the zeros beneath it,
+            so the stack reads as 4,325.
           {:else}
             Expanded, every place value appears on its own card: 4,000 + 300 + 20 + 5 = 4,325.
           {/if}
@@ -192,7 +187,7 @@
           <h3>Quick classroom moves</h3>
         </div>
         <ul>
-          <li><strong>Ask, “What is hiding under the 3?”</strong> Toggle X-ray and prove the zeros are still there.</li>
+          <li><strong>Read it, then check it.</strong> Ask pupils to say a number aloud, then turn on Words to see it written under the cards.</li>
           <li><strong>Pull the digit end to take a card out.</strong> Make 4,325, drag the 300 card out by its flat left end, and the group becomes 4,025. Slide a 700 card in to make 4,725.</li>
           <li><strong>Move the whole number</strong> by dragging the arrow spine of a stack or the number chip in its toolbar. In expanded view, use the number chip. The glow tells you which will happen.</li>
           <li><strong>Expand, then stack.</strong> Read the number sentence first, then build the compact number. Double-click a group to switch between the two.</li>
@@ -401,7 +396,7 @@
     outline-offset: 1px;
   }
 
-  .peek-toggle {
+  .words-toggle {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -411,12 +406,7 @@
     cursor: pointer;
   }
 
-  .peek-toggle.disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
-
-  .peek-toggle input {
+  .words-toggle input {
     width: 13px;
     height: 13px;
     margin: 0;
@@ -448,16 +438,14 @@
     top: 0;
     line-height: 0;
     transition:
-      left 420ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      opacity 200ms ease;
+      left 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
-  .demo-arrow.peek :global(.guide-demo-card > path:first-of-type) {
-    fill-opacity: 0.3;
-  }
-
-  .demo-arrow.peek :global(.guide-demo-card > path:nth-of-type(2)) {
-    opacity: 0.12;
+  .demo-words {
+    margin: 4px 0 0;
+    color: var(--muted-strong);
+    font-size: 12px;
+    font-weight: 650;
   }
 
   .demo-plus {
@@ -737,7 +725,7 @@
       padding-inline: 12px;
     }
 
-    .peek-toggle input {
+    .words-toggle input {
       width: 20px;
       height: 20px;
     }

@@ -13,6 +13,7 @@ import {
   layoutPiece,
   mergeCards,
   numberToCards,
+  numberToWords,
   overlapOf,
   pieceBounds,
   pieceVisualBounds,
@@ -334,5 +335,31 @@ describe('number helpers', () => {
     expect(clamp(-5, 10, 100)).toBe(10);
     expect(clamp(105, 10, 100)).toBe(100);
     expect(clamp(50, 10, 100)).toBe(50);
+  });
+});
+
+describe('numberToWords', () => {
+  it('names every value a piece can hold, in sentence case', () => {
+    expect(numberToWords(4325)).toBe('Four thousand three hundred twenty-five');
+    expect(numberToWords(9999)).toBe('Nine thousand nine hundred ninety-nine');
+    expect(numberToWords(1)).toBe('One');
+    expect(numberToWords(7)).toBe('Seven');
+  });
+
+  it('uses the teen words and plain tens', () => {
+    expect(numberToWords(10)).toBe('Ten');
+    expect(numberToWords(13)).toBe('Thirteen');
+    expect(numberToWords(19)).toBe('Nineteen');
+    expect(numberToWords(20)).toBe('Twenty');
+    expect(numberToWords(90)).toBe('Ninety');
+  });
+
+  it('leaves out empty places instead of saying zero', () => {
+    expect(numberToWords(100)).toBe('One hundred');
+    expect(numberToWords(105)).toBe('One hundred five');
+    expect(numberToWords(4005)).toBe('Four thousand five');
+    expect(numberToWords(7010)).toBe('Seven thousand ten');
+    expect(numberToWords(3400)).toBe('Three thousand four hundred');
+    expect(numberToWords(8000)).toBe('Eight thousand');
   });
 });

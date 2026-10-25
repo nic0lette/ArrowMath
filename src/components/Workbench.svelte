@@ -13,7 +13,6 @@
     y: number;
     z: number;
     mode: PieceMode;
-    isBase: boolean;
     grouped: boolean;
     dragging: boolean;
     visibleWidth: number;
@@ -41,7 +40,6 @@
           y: piece.y + entry.localY,
           z: 20 + piece.z * 8 + index,
           mode: piece.mode,
-          isBase: entry.isBase,
           grouped: piece.cards.length > 1,
           dragging,
           visibleWidth,
@@ -125,9 +123,7 @@
           z={entry.z}
           theme={game.theme}
           mode={entry.mode}
-          isBase={entry.isBase}
           grouped={entry.grouped}
-          xray={game.xray}
           dragging={entry.dragging}
           visibleWidth={entry.visibleWidth}
           spring={entry.spring}

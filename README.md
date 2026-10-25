@@ -46,7 +46,7 @@ The Playwright suite starts its own Vite server on port 4173. It covers:
 - pulling cards out by their digit end, moving groups from the arrow spine or number chip, and double-click stack/expand
 - repeated drags settling from the new drop rather than the previous resting position
 - the regression where a card was picked up mid-bounce and jumped to its spring destination
-- expand/stack, X-ray revealing hidden zeros, undoable reset, the teacher guide, and a phone-width layout check
+- expand/stack, number words, undoable reset, the teacher guide, and a phone-width layout check
 
 Unit tests live in `tests/unit/`; browser tests and drag helpers live in `tests/e2e/`.
 
@@ -59,7 +59,7 @@ Unit tests live in `tests/unit/`; browser tests and drag helpers live in `tests/
 - **Touch edges to chain** — a shallow edge overlap (10–27px) builds an expanded number sentence with `+` operators and a result.
 - **Same place bounces** — a place-value column can only hold one card. Drop a duplicate and the stationary group stays anchored while the incoming card springs into nearby clear space.
 - **Expand / Stack** — use the small group toolbar above a stack to spring it open into `4,000 + 300 + 20 + 5 = 4,325`, then stack it back up. Double-click a group to toggle the same way. Once expanded, dragging any card pulls it out.
-- **X-ray zeros** — in a stacked group, turn on X-ray to make the top cards 88% opaque, fade their trailing zeros, and let their fills become see-through. The placeholder zeros covered by the top cards become visible as ghost digits. It has no effect on single cards or expanded groups, where nothing is hidden.
+- **Number words** — turn on Words (the eye button) to write every card and group's value in words just under its cards, e.g. 4,325 reads "Four thousand three hundred twenty-five". Near the bottom edge the words move above the cards. The choice is remembered.
 - **Make a number** — type a target such as `4325` and add it as separate cards or as one stacked group.
 - **Classroom tools** — switch curricula, toggle grid snapping, tidy every card into rows, mute the procedural sound, clear the canvas (with undo), or open the teacher guide.
 
@@ -78,7 +78,7 @@ src/
   App.svelte                App shell and pointer wiring
   app.css                   Design tokens, four themes, app layout
   components/
-    Toolbar.svelte          Theme, grid, X-ray, audio, tidy, reset, guide
+    Toolbar.svelte          Theme, grid, number words, audio, tidy, reset, guide
     Workbench.svelte        Flat card layer, overlays, status
     CardNode.svelte         Accessible draggable card
     PieceOverlay.svelte     Group toolbar, + operators, = result
@@ -122,7 +122,8 @@ tests/
   number" field only strips commas from typed input. Doing this properly means
   adding translations for the UI text, a locale picker in the toolbar, and
   defaulting to the browser's locale when it is one we support. Number
-  formatting and input parsing should then follow the chosen locale.
+  formatting and input parsing should then follow the chosen locale, and
+  the number words (`numberToWords`) need a version per language.
 
 ## Arrow card integration
 

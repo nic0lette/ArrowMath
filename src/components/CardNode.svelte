@@ -14,9 +14,7 @@
     z: number;
     theme: ColorTheme;
     mode: PieceMode;
-    isBase: boolean;
     grouped: boolean;
-    xray: boolean;
     dragging: boolean;
     visibleWidth: number;
     spring: SpringConfig;
@@ -30,16 +28,13 @@
     z,
     theme,
     mode,
-    isBase,
     grouped,
-    xray,
     dragging,
     visibleWidth,
     spring,
   }: Props = $props();
 
   const width = $derived(getArrowCardWidth(card.place));
-  const showThrough = $derived(xray && mode === 'stack' && !isBase);
   const elId = $derived(`card-${card.id.replace(/[^a-zA-Z0-9_-]/g, '')}`);
   const value = $derived(card.digit * card.place);
   const peelLift = $derived(
@@ -111,7 +106,6 @@
 <div
   class="card-node"
   class:dragging
-  class:show-through={showThrough}
   class:peel-lift={peelLift}
   class:move-intent={moveIntent}
   style:z-index={z}
@@ -141,11 +135,7 @@
       theme={theme}
       idPrefix={elId}
       className="workbench-card"
-      showZeroGhost={xray && mode === 'stack' && !isBase}
     />
-    {#if showThrough}
-      <span class="peek-edge" aria-hidden="true"></span>
-    {/if}
     <div class="paper-layer" use:paperCurl={{ bent: curlBent, width, length: curl }}></div>
   </div>
 </div>
@@ -219,29 +209,6 @@
   .card-node.dragging .card-inner {
     transform: scale(1.035) rotate(-1.1deg);
     filter: drop-shadow(0 18px 22px rgba(15, 23, 42, 0.2));
-  }
-
-  .card-node.show-through .card-inner {
-    opacity: 0.88;
-  }
-
-  /* X-ray: keep the top card's digits and outline crisp, but let its fill go
-     translucent so the covered zeros on the card underneath show through. */
-  .card-node.show-through :global(.arrow-card-svg > path:first-of-type) {
-    fill-opacity: 0.3;
-    transition: fill-opacity 220ms ease;
-  }
-
-  .card-node.show-through :global(.arrow-card-svg > path:nth-of-type(2)) {
-    opacity: 0.12;
-  }
-
-  .peek-edge {
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    border-radius: 10px 28px 28px 10px;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
   }
 
   @media (pointer: coarse) {

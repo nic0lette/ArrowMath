@@ -4,6 +4,7 @@
   import {
     formatNumber,
     layoutPiece,
+    numberToWords,
     pieceValue,
     placeTier,
     type Piece,
@@ -29,9 +30,29 @@
       piece.spring !== 'bounce' &&
       (isSelected || keepChromeForChromeDrag),
   );
-  const belowTop = $derived(piece.y + layout.height + 10);
-  const chromeAbove = $derived(piece.y >= 54 || belowTop + 38 > game.canvas.height - 8);
-  const chromeTop = $derived(chromeAbove ? Math.max(8, piece.y - 44) : belowTop);
+  // Number words sit just under the cards, or just above them when the piece
+  // is too close to the bottom edge. The toolbar steps around them.
+  const WORDS_GAP = 4;
+  const WORDS_HEIGHT = 20;
+  const words = $derived(numberToWords(value));
+  let wordsWidth = $state(0);
+  const wordsBelow = $derived(
+    piece.y + layout.height + WORDS_GAP + WORDS_HEIGHT <= game.canvas.height - 4,
+  );
+  const wordsTop = $derived(
+    wordsBelow ? piece.y + layout.height + WORDS_GAP : piece.y - WORDS_GAP - WORDS_HEIGHT,
+  );
+  // Long words beside the right edge shift left rather than being cut off.
+  const wordsLeft = $derived(
+    Math.max(8, Math.min(piece.x, game.canvas.width - 8 - wordsWidth)),
+  );
+  const wordsSpace = WORDS_GAP + WORDS_HEIGHT;
+  const belowTop = $derived(
+    piece.y + layout.height + 10 + (game.showWords && wordsBelow ? wordsSpace : 0),
+  );
+  const aboveTop = $derived(piece.y - 44 - (game.showWords && !wordsBelow ? wordsSpace : 0));
+  const chromeAbove = $derived(aboveTop >= 10 || belowTop + 38 > game.canvas.height - 8);
+  const chromeTop = $derived(chromeAbove ? Math.max(8, aboveTop) : belowTop);
   const chromeMin = $derived(piece.cards.length > 1 ? 172 : 118);
   const chromeLeft = $derived(
     Math.min(
@@ -100,6 +121,15 @@
       <span class="equals" aria-hidden="true">=</span>
       <span>{formatNumber(value)}</span>
     </span>
+  {/if}
+
+  {#if game.showWords}
+    <span
+      class="piece-words"
+      style:left="{wordsLeft}px"
+      style:top="{wordsTop}px"
+      bind:offsetWidth={wordsWidth}
+    >{words}</span>
   {/if}
 
   {#if showChrome}
@@ -224,6 +254,18 @@
     white-space: nowrap;
     pointer-events: none;
     animation: result-in 240ms 40ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .piece-words {
+    position: absolute;
+    height: 20px;
+    color: var(--muted-strong);
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 20px;
+    letter-spacing: 0.005em;
+    white-space: nowrap;
+    pointer-events: none;
   }
 
   .equation-result .equals {

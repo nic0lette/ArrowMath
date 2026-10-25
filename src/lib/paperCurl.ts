@@ -51,7 +51,7 @@ const sources = new Map<string, Source>();
 let uid = 0;
 
 /**
- * A bitmap of the card as it looks right now, x-ray styling included, for
+ * A bitmap of the card as it looks right now, stylesheet tweaks included, for
  * drawing the bent end. Two details keep it identical to the SVG beside it:
  * the viewBox is padded, because an SVG drawn as an image is cut off at its
  * viewBox and would lose the outer half of the stroke; and the image is sized
@@ -63,7 +63,8 @@ function cardSource(svg: SVGSVGElement, width: number): Source {
   const clone = svg.cloneNode(true) as SVGSVGElement;
   const live = svg.querySelectorAll<SVGElement>('path, line, text');
   clone.querySelectorAll<SVGElement>('path, line, text').forEach((element, index) => {
-    // Stylesheet rules (x-ray) do not reach an SVG drawn as an image.
+    // Stylesheet rules (e.g. the move-intent outline) do not reach an SVG
+    // drawn as an image.
     const style = getComputedStyle(live[index]);
     element.setAttribute('fill-opacity', style.fillOpacity);
     element.setAttribute('stroke-opacity', style.strokeOpacity);
@@ -87,7 +88,7 @@ function cardSource(svg: SVGSVGElement, width: number): Source {
   canvas.height = Math.round(outerH * dpr);
   const source: Source = { canvas, dpr, ready: false, waiting: new Set() };
   sources.set(key, source);
-  // Theme and x-ray changes make new bitmaps; keep only the recent ones.
+  // Theme and outline changes make new bitmaps; keep only the recent ones.
   if (sources.size > 48) sources.delete(sources.keys().next().value!);
 
   const image = new Image();
@@ -161,7 +162,7 @@ export function paperCurl(node: HTMLElement, initial: PaperCurlParams) {
   shape();
 
   function setCardVisible(visible: boolean) {
-    for (const element of card.querySelectorAll<HTMLElement>(':scope > .arrow-card, :scope > .peek-edge')) {
+    for (const element of card.querySelectorAll<HTMLElement>(':scope > .arrow-card')) {
       element.style.visibility = visible ? '' : 'hidden';
     }
     canvas.style.display = visible ? 'none' : '';

@@ -70,18 +70,18 @@
 
       <button
         class="tool-button"
-        class:active={game.xray}
+        class:active={game.showWords}
         type="button"
-        aria-pressed={game.xray}
-        aria-label="X-ray peek"
-        title="X-ray peek: see the hidden zeros inside a stacked group"
-        onclick={() => game.toggleXray()}
+        aria-pressed={game.showWords}
+        aria-label="Number words"
+        title="Show each number in words under its cards"
+        onclick={() => game.toggleWords()}
       >
         <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
           <path d="M1.7 8S4 3.8 8 3.8 14.3 8 14.3 8 12 12.2 8 12.2 1.7 8 1.7 8Z" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>
           <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.35"/>
         </svg>
-        <span class="tool-label">X-ray</span>
+        <span class="tool-label">Words</span>
       </button>
 
       <button

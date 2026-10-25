@@ -516,6 +516,39 @@ export function findFreeSpot(options: {
   return best;
 }
 
+const WORDS_UNDER_TWENTY = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+  'seventeen', 'eighteen', 'nineteen',
+];
+const WORDS_TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+/**
+ * Writes a piece's value in words, e.g. 4325 → "Four thousand three hundred
+ * twenty-five". Empty places are left out rather than read as zero. English
+ * only for now (see the locale TODO on formatNumber).
+ */
+export function numberToWords(value: number): string {
+  if (!Number.isInteger(value) || value < 0 || value > 9999) return formatNumber(value);
+  if (value === 0) return 'Zero';
+
+  const thousands = Math.floor(value / 1000);
+  const hundreds = Math.floor(value / 100) % 10;
+  const rest = value % 100;
+  const parts: string[] = [];
+  if (thousands) parts.push(`${WORDS_UNDER_TWENTY[thousands]} thousand`);
+  if (hundreds) parts.push(`${WORDS_UNDER_TWENTY[hundreds]} hundred`);
+  if (rest >= 20) {
+    const ones = rest % 10;
+    parts.push(WORDS_TENS[Math.floor(rest / 10)] + (ones ? `-${WORDS_UNDER_TWENTY[ones]}` : ''));
+  } else if (rest) {
+    parts.push(WORDS_UNDER_TWENTY[rest]);
+  }
+
+  const text = parts.join(' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function numberToCards(value: number): Array<{ place: Place; digit: number }> {
   if (!Number.isFinite(value) || value < 1 || value > 9999) return [];
   const places: Place[] = [1000, 100, 10, 1];

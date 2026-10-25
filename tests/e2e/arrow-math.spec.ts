@@ -286,7 +286,7 @@ test('grabbing a card mid-bounce uses its visual position instead of jumping', a
   await expect(workbench(page)).toHaveAttribute('data-piece-count', '2');
 });
 
-test('expands into a number sentence, stacks again, and toggles x-ray', async ({ page }) => {
+test('expands into a number sentence and stacks again', async ({ page }) => {
   await gotoApp(page);
   await addStacked(page, 4325, 4);
 
@@ -305,31 +305,6 @@ test('expands into a number sentence, stacks again, and toggles x-ray', async ({
   await expect(groupChrome).toHaveAttribute('data-mode', 'stack');
   await expect(page.locator('.equation-operator')).toHaveCount(0);
   await expect(page.locator('.equation-result')).toHaveCount(0);
-
-  await page.getByRole('button', { name: 'X-ray peek' }).click();
-  await expect(page.locator('.card-node.show-through')).toHaveCount(3);
-  await page.waitForTimeout(300);
-  const topCard = page.locator('.card-node.show-through').first();
-  const opacity = await topCard
-    .locator('.card-inner')
-    .evaluate((element) => getComputedStyle(element).opacity);
-  expect(Number(opacity)).toBeCloseTo(0.88, 1);
-  const fillOpacity = await topCard
-    .locator('svg > path')
-    .first()
-    .evaluate((element) => getComputedStyle(element).fillOpacity);
-  expect(Number(fillOpacity)).toBeCloseTo(0.3, 1);
-  const zeroOpacities = await topCard
-    .locator('svg text[font-size="32"]')
-    .evaluateAll((elements) => elements.map((element) => element.getAttribute('opacity')));
-  expect(zeroOpacities).toContain('0.35');
-
-  // X-ray is specifically a stacked-view tool: expanded groups already show all
-  // cards separately, so there is nothing hidden to reveal.
-  await groupChrome.getByRole('button', { name: 'Expand' }).click();
-  await expect(page.locator('.card-node.show-through')).toHaveCount(0);
-  await groupChrome.getByRole('button', { name: 'Stack' }).click();
-  await expect(page.locator('.card-node.show-through')).toHaveCount(3);
 });
 
 test('the digit end lifts one card and the arrow side lifts the whole stack', async ({ page }) => {
@@ -544,14 +519,79 @@ test('a single card has no pull-out lift and still drags normally', async ({ pag
   await expect(workbench(page)).toHaveAttribute('data-card-count', '1');
 });
 
-test('x-ray explains when there is no stacked group to reveal', async ({ page }) => {
+test('the words button writes every number in words under its cards', async ({ page }) => {
   await gotoApp(page);
+  await addStacked(page, 4325, 4);
   await addBankCard(page, 1, 7);
+  const words = page.locator('.piece-words');
+  const wordsButton = page.getByRole('button', { name: 'Number words' });
 
-  await page.getByRole('button', { name: 'X-ray peek' }).click();
+  await expect(words).toHaveCount(0);
+  await expect(wordsButton).toHaveAttribute('aria-pressed', 'false');
 
-  await expect(page.locator('.card-node.show-through')).toHaveCount(0);
-  await expect(page.locator('.toast-message')).toContainText('stacked group');
+  await wordsButton.click();
+  await expect(wordsButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(words).toHaveCount(2);
+  await expect(words.filter({ hasText: 'Four thousand three hundred twenty-five' })).toHaveCount(1);
+  await expect(words.filter({ hasText: /^Seven$/ })).toHaveCount(1);
+
+  // The words sit just under their cards and follow the value as it changes.
+  const stackWords = words.filter({ hasText: 'Four thousand' });
+  const thousands = await boxOf(card(page, 1000, 4));
+  const label = await boxOf(stackWords);
+  expect(label.y).toBeGreaterThanOrEqual(thousands.y + thousands.height - 1);
+  expect(label.y).toBeLessThan(thousands.y + thousands.height + 16);
+
+  await dragCardFromPoint(page, card(page, 100, 3), 18, 34, 240, 140);
+  await expect(words.filter({ hasText: 'Four thousand twenty-five' })).toHaveCount(1);
+  await expect(words.filter({ hasText: 'Three hundred' })).toHaveCount(1);
+
+  // The choice survives a reload, and turning it off removes the words.
+  await page.waitForTimeout(600);
+  await page.reload();
+  await expect(words).toHaveCount(3);
+  await page.getByRole('button', { name: 'Number words' }).click();
+  await expect(words).toHaveCount(0);
+});
+
+test('number words never sit under the toolbar or off the workbench', async ({ page }) => {
+  await gotoSeeded(page, [], { words: true });
+  const layer = await boxOf(cardsLayer(page));
+  await gotoSeeded(
+    page,
+    [
+      // At the very top the toolbar opens below, so it must clear the words.
+      {
+        id: 'top',
+        cards: [
+          { id: 'c-thousands', place: 1000, digit: 4 },
+          { id: 'c-hundreds', place: 100, digit: 3 },
+        ],
+        x: 96,
+        y: 16,
+      },
+      // At the very bottom there is no room underneath, so the words go above.
+      {
+        id: 'bottom',
+        cards: [{ id: 'c-ones', place: 1, digit: 7 }],
+        x: Math.round(layer.width - 16 - 86),
+        y: Math.round(layer.height - 16 - 68),
+      },
+    ],
+    { words: true },
+  );
+
+  await selectPieceOf(page, card(page, 100, 3));
+  const topWords = await boxOf(page.locator('.piece-words', { hasText: 'Four thousand' }));
+  const toolbar = await boxOf(chrome(page, 'top'));
+  expect(toolbar.y).toBeGreaterThanOrEqual(topWords.y + topWords.height);
+
+  const bottomWords = page.locator('.piece-words', { hasText: /^Seven$/ });
+  const ones = await boxOf(card(page, 1, 7));
+  expect((await boxOf(bottomWords)).y + (await boxOf(bottomWords)).height).toBeLessThanOrEqual(
+    ones.y + 1,
+  );
+  await expectInsideCardsLayer(page, [bottomWords]);
 });
 
 test('reset is undoable and the teacher guide opens and closes', async ({ page }) => {
