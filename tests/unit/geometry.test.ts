@@ -8,6 +8,7 @@ import {
   clamp,
   findBouncePosition,
   findDropCandidate,
+  findFreeSpot,
   formatNumber,
   getMergedPosition,
   layoutPiece,
@@ -371,5 +372,22 @@ describe('numberToWords', () => {
     expect(numberToWords(7010)).toBe('Seven thousand ten');
     expect(numberToWords(3400)).toBe('Three thousand four hundred');
     expect(numberToWords(8000)).toBe('Eight thousand');
+  });
+});
+
+describe('findFreeSpot', () => {
+  it('keeps clear of extra obstacles', () => {
+    const canvas = { width: 600, height: 400 };
+    const obstacles = [{ x: 0, y: 0, width: 600, height: 200 }];
+    const spot = findFreeSpot({ width: 100, height: 60, pieces: [], canvas, obstacles });
+    expect(spot.y).toBeGreaterThanOrEqual(216);
+  });
+
+  it('picks the least crowded spot when nothing is fully clear', () => {
+    const canvas = { width: 600, height: 400 };
+    // Everything is covered except a strip down the left edge.
+    const obstacles = [{ x: 120, y: 0, width: 480, height: 400 }];
+    const spot = findFreeSpot({ width: 200, height: 60, pieces: [], canvas, obstacles });
+    expect(spot.x).toBeLessThan(60);
   });
 });

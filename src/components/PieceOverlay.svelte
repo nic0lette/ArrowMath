@@ -61,6 +61,9 @@
     ),
   );
   const isExpanded = $derived(piece.mode === 'expand');
+  // On a plus, the sum's own rows give the answers, and the plus sits where
+  // this chip would.
+  const attached = $derived(game.isAttached(piece.id));
   const overlayZ = $derived(20 + piece.z * 8 + 6);
 
   function toggleMode(event: MouseEvent) {
@@ -112,6 +115,7 @@
         aria-hidden="true">+</span
       >
     {/each}
+    {#if !attached}
     <span
       class="equation-result"
       style:left="{piece.x + layout.resultX}px"
@@ -121,6 +125,7 @@
       <span class="equals" aria-hidden="true">=</span>
       <span>{formatNumber(value)}</span>
     </span>
+    {/if}
   {/if}
 
   {#if game.showWords}

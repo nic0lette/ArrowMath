@@ -3,6 +3,7 @@
   import { layoutPiece, type Card, type PieceMode } from '../lib/geometry';
   import CardNode from './CardNode.svelte';
   import PieceOverlay from './PieceOverlay.svelte';
+  import SumOverlay from './SumOverlay.svelte';
   import HoverHalo from './HoverHalo.svelte';
   import EmptyState from './EmptyState.svelte';
 
@@ -15,6 +16,7 @@
     mode: PieceMode;
     grouped: boolean;
     dragging: boolean;
+    carried: boolean;
     visibleWidth: number;
     spring: ReturnType<typeof springFor>;
   }
@@ -25,6 +27,7 @@
     for (const piece of game.pieces) {
       const layout = layoutPiece(piece.cards, piece.mode);
       const dragging = game.draggingPieceId === piece.id;
+      const carried = game.isCarried(piece.id);
 
       layout.cards.forEach((entry, index) => {
         // In a stack, every card but the front one is tucked under the next
@@ -42,6 +45,7 @@
           mode: piece.mode,
           grouped: piece.cards.length > 1,
           dragging,
+          carried,
           visibleWidth,
           spring: springFor(piece),
         });
@@ -64,7 +68,7 @@
 
   function onCanvasPointerDown(event: PointerEvent) {
     const target = event.target as HTMLElement;
-    if (target.closest('.card-node, .piece-chrome, .empty-state, button, input, a')) return;
+    if (target.closest('.card-node, .piece-chrome, [data-sum-handle], .empty-state, button, input, a')) return;
 
     // On a phone, leave the "Make a number" field and close its keyboard when
     // the teacher moves on to touching the workbench.
@@ -95,6 +99,7 @@
     data-workbench
     data-card-count={game.cardCount}
     data-piece-count={game.pieces.length}
+    data-sum-count={game.sums.length}
   >
     <div class="canvas-head" aria-hidden="true">
       <div class="canvas-status">
@@ -109,11 +114,14 @@
       </div>
     </div>
 
-    {#if game.pieces.length === 0}
+    {#if game.pieces.length === 0 && game.sums.length === 0}
       <EmptyState />
     {/if}
 
     <div class="cards-layer">
+      {#each game.sums as sum (sum.id)}
+        <SumOverlay {sum} />
+      {/each}
       {#each cards as entry (entry.card.id)}
         <CardNode
           card={entry.card}
@@ -125,6 +133,7 @@
           mode={entry.mode}
           grouped={entry.grouped}
           dragging={entry.dragging}
+          carried={entry.carried}
           visibleWidth={entry.visibleWidth}
           spring={entry.spring}
         />

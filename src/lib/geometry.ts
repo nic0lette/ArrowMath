@@ -481,8 +481,10 @@ export function findFreeSpot(options: {
   pieces: Piece[];
   canvas: CanvasSize;
   ignoreId?: string;
+  /** Other areas to keep clear, such as a plus and its place rows. */
+  obstacles?: Bounds[];
 }): { x: number; y: number } {
-  const { width, height, pieces, canvas, ignoreId } = options;
+  const { width, height, pieces, canvas, ignoreId, obstacles = [] } = options;
   const pad = Math.max(CANVAS_PADDING, 20);
   const step = GRID_SIZE;
   const maxX = Math.max(pad, canvas.width - width - pad);
@@ -493,8 +495,9 @@ export function findFreeSpot(options: {
   };
   const others = pieces
     .filter((piece) => piece.id !== ignoreId)
-    .map((piece) => {
-      const box = pieceBounds(piece);
+    .map((piece) => pieceBounds(piece))
+    .concat(obstacles)
+    .map((box) => {
       return {
         x: box.x - 16,
         y: box.y - 16,
@@ -505,13 +508,18 @@ export function findFreeSpot(options: {
 
   let best = preferred;
   let bestDistance = Number.POSITIVE_INFINITY;
+  // A crowded canvas may have no fully clear spot. Then the least covered
+  // one wins, rather than dropping the new item on top of everything.
+  let bestCovered = Number.POSITIVE_INFINITY;
 
   for (let y = pad; y <= maxY; y += step) {
     for (let x = pad; x <= maxX; x += step) {
       const candidate: Bounds = { x, y, width, height };
-      if (others.some((other) => overlapOf(candidate, other).area > 0)) continue;
+      const covered = others.reduce((total, other) => total + overlapOf(candidate, other).area, 0);
+      if (covered > bestCovered) continue;
       const distance = (x - preferred.x) ** 2 + (y - preferred.y) ** 2;
-      if (distance < bestDistance) {
+      if (covered < bestCovered || distance < bestDistance) {
+        bestCovered = covered;
         bestDistance = distance;
         best = { x, y };
       }

@@ -9,12 +9,13 @@
     title: string;
     hint: string;
   }> = [
-    { place: 1000, title: 'Thousands', hint: '1,000 – 9,000' },
-    { place: 100, title: 'Hundreds', hint: '100 – 900' },
-    { place: 10, title: 'Tens', hint: '10 – 90' },
-    { place: 1, title: 'Ones', hint: '1 – 9' },
+    { place: 1000, title: 'Thousands', hint: '0,000 – 9,000' },
+    { place: 100, title: 'Hundreds', hint: '000 – 900' },
+    { place: 10, title: 'Tens', hint: '00 – 90' },
+    { place: 1, title: 'Ones', hint: '0 – 9' },
   ];
-  const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  // Zero cards hold an empty place open, so 205 can read 200 + 00 + 5.
+  const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
   const strips = $state<Record<number, HTMLDivElement | null>>({});
 
   let makeValue = $state('');
@@ -229,6 +230,16 @@
         <span>Add Stacked</span>
       </button>
     </form>
+
+    <button
+      class="make-button plus-button"
+      type="button"
+      title="Add a plus, then drag a number to each side of it"
+      onclick={() => game.addSum()}
+    >
+      <span class="plus-glyph" aria-hidden="true">+</span>
+      <span>Add Plus</span>
+    </button>
 
     <button
       class="collapse-button"
@@ -503,6 +514,12 @@
     border-color: var(--line-strong);
     background: var(--surface-muted);
     color: var(--ink);
+  }
+
+  .plus-glyph {
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
   }
 
   .make-button.primary {

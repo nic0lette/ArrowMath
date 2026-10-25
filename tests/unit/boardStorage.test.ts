@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   deserializeBoard,
+  deserializeSums,
   flushBoard,
   loadBoard,
   saveBoard,
@@ -129,6 +130,55 @@ describe('deserializeBoard validation', () => {
 
     expect(board).toHaveLength(1);
     expect(board[0]).toMatchObject({ x: 0, y: 0, mode: 'stack', z: 1, spring: 'default' });
+  });
+});
+
+describe('zero cards', () => {
+  it('keeps a zero card, which holds an empty place open', () => {
+    const board = deserializeBoard({
+      version: BOARD_VERSION,
+      pieces: [{ id: 'p', cards: [{ id: 'c1', place: 10, digit: 0 }], x: 0, y: 0, mode: 'stack', z: 1 }],
+    });
+
+    expect(board[0].cards).toEqual([{ id: 'c1', place: 10, digit: 0 }]);
+  });
+});
+
+describe('sums', () => {
+  const ids = new Set(['a', 'b', 'c']);
+
+  it('round-trips a plus with the numbers attached to it', () => {
+    const stored = serializeBoard(
+      [piece('a', [card(1, 4)], 0, 0), piece('b', [card(1, 8)], 0, 0)],
+      [{ id: 'sum-1', x: 300.123, y: 200, left: 'a', right: 'b', revealed: { 1: '4+8' } }],
+    );
+
+    expect(deserializeSums(JSON.parse(JSON.stringify(stored)), ids)).toEqual([
+      { id: 'sum-1', x: 300.12, y: 200, left: 'a', right: 'b', revealed: { 1: '4+8' } },
+    ]);
+  });
+
+  it('empties a side whose number no longer exists or is already attached elsewhere', () => {
+    const sums = deserializeSums(
+      {
+        sums: [
+          { id: 's1', x: 0, y: 0, left: 'gone', right: 'a', revealed: {} },
+          { id: 's2', x: 0, y: 0, left: 'a', right: 'b', revealed: { 7: 'x', 10: 3 } },
+        ],
+      },
+      ids,
+    );
+
+    expect(sums.map((sum) => [sum.left, sum.right])).toEqual([
+      [null, 'a'],
+      [null, 'b'],
+    ]);
+    expect(sums[1].revealed).toEqual({});
+  });
+
+  it('treats a board saved before sums existed as having none', () => {
+    expect(deserializeSums({ version: BOARD_VERSION, pieces: [] }, ids)).toEqual([]);
+    expect(deserializeSums({ sums: [{ id: '' }, null, 'x'] }, ids)).toEqual([]);
   });
 });
 

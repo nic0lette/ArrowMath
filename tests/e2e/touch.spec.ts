@@ -108,7 +108,9 @@ test('a diagonal pull from every tray row still reaches the workbench', async ({
   ] as const;
 
   for (const [index, drop] of drops.entries()) {
-    const card = bankCard(page, drop.place, 4);
+    // Digit 3 is the fourth card in each row (after 0), so it starts in view
+    // without the strip having to scroll first.
+    const card = bankCard(page, drop.place, 3);
     await card.scrollIntoViewIfNeeded();
     const box = await card.boundingBox();
     if (!box) throw new Error(`Bank card ${drop.place} has no box`);

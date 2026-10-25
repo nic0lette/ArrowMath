@@ -1,9 +1,23 @@
 import { CARD_HEIGHT, getArrowCardWidth, type ColorTheme } from 'arrow-cards';
+import {
+  PLUS_GAP,
+  PLUS_SIZE,
+  ROW_GAP,
+  ROW_HEIGHT,
+  ROWS_OFFSET,
+  attachedSide,
+  findSumSlot,
+  placeRows,
+  sumLayout,
+  type Sum,
+  type SumSide,
+} from './addition';
 import { audio } from './audio';
 import {
   deserializeBoard,
   flushBoard,
   loadBoard,
+  loadSums,
   saveBoardLater,
   serializeBoard,
 } from './boardStorage';
@@ -70,6 +84,19 @@ export interface DragIntent {
   pieceId: string;
   cardId: string | null;
   kind: DragIntentKind;
+}
+
+export interface SumHover {
+  sumId: string;
+  side: SumSide;
+}
+
+interface SumDragState {
+  sumId: string;
+  pointerId: number;
+  startPointer: { x: number; y: number };
+  startSum: { x: number; y: number };
+  moved: boolean;
 }
 
 interface DragState {
@@ -158,6 +185,19 @@ function clonePieces(pieces: Piece[]): Piece[] {
   }));
 }
 
+function cloneSums(sums: Sum[]): Sum[] {
+  return sums.map((sum) => ({ ...sum, revealed: { ...sum.revealed } }));
+}
+
+/** Width of the room an empty plus is given: a few cards each side. */
+const SUM_SIDE_RESERVE = 180;
+/** Height of four place rows, kept clear above a new plus. */
+const SUM_ROWS_RESERVE = ROWS_OFFSET + 4 * (ROW_HEIGHT + ROW_GAP);
+
+function clampShift(start: number, size: number, total: number): number {
+  return clamp(start, CANVAS_PADDING, Math.max(CANVAS_PADDING, total - size - CANVAS_PADDING)) - start;
+}
+
 function makeCard(place: Place, digit: number): Card {
   return { id: makeId('card'), place, digit };
 }
@@ -195,6 +235,11 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 class ArrowMathStore {
   pieces = $state<Piece[]>([]);
+  /** Each "+" on the board, with the pieces attached to its two sides. */
+  sums = $state<Sum[]>([]);
+  selectedSumId = $state<string | null>(null);
+  /** The plus side a dragged number would attach to if dropped now. */
+  sumHover = $state<SumHover | null>(null);
   theme = $state<ColorTheme>('curriculum');
   muted = $state(false);
   snapToGrid = $state(true);
@@ -211,6 +256,7 @@ class ArrowMathStore {
   canvas = $state<CanvasSize>({ width: 1200, height: 560 });
 
   private drag = $state<DragState | null>(null);
+  private sumDrag = $state<SumDragState | null>(null);
   private lastPointerDown: { pieceId: string; time: number; x: number; y: number } | null = null;
   private intentRefreshToken = 0;
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -220,7 +266,7 @@ class ArrowMathStore {
   private toastDuration = 0;
   private toastShownAt = 0;
   private bounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private resetSnapshot: Piece[] | null = null;
+  private resetSnapshot: { pieces: Piece[]; sums: Sum[] } | null = null;
   private lastCanvasWidth = 0;
   private lastCanvasHeight = 0;
   private pendingBoardClamp = false;
@@ -242,13 +288,30 @@ class ArrowMathStore {
     const restored = loadBoard();
     if (restored.length > 0) {
       this.pieces = restored;
+      this.sums = loadSums(restored);
       this.pendingBoardClamp = true;
     }
     this.watchBoard();
   }
 
   get isInteracting(): boolean {
-    return Boolean(this.drag || this.bankDrag?.active);
+    return Boolean(this.drag || this.sumDrag || this.bankDrag?.active);
+  }
+
+  /** Pieces following a plus that is being dragged; they move without a spring. */
+  isCarried(pieceId: string): boolean {
+    const drag = this.sumDrag;
+    if (!drag?.moved) return false;
+    const sum = this.sums.find((entry) => entry.id === drag.sumId);
+    return Boolean(sum && attachedSide(sum, pieceId));
+  }
+
+  isAttached(pieceId: string): boolean {
+    return this.sums.some((sum) => attachedSide(sum, pieceId));
+  }
+
+  private sumOf(pieceId: string): Sum | null {
+    return this.sums.find((sum) => attachedSide(sum, pieceId)) ?? null;
   }
 
   get selectedPiece(): Piece | null {
@@ -386,7 +449,7 @@ class ArrowMathStore {
     if (this.boardWatcherStop) return;
     this.boardWatcherStop = $effect.root(() => {
       $effect(() => {
-        saveBoardLater(serializeBoard(this.pieces));
+        saveBoardLater(serializeBoard(this.pieces, this.sums));
       });
     });
   }
@@ -435,6 +498,7 @@ class ArrowMathStore {
       piece.x = clamp(piece.x, CANVAS_PADDING, Math.max(CANVAS_PADDING, maxX));
       piece.y = clamp(piece.y, CANVAS_PADDING, Math.max(CANVAS_PADDING, maxY));
     }
+    this.settleSums();
   }
 
   private clientToCanvas(clientX: number, clientY: number): { x: number; y: number } {
@@ -489,6 +553,7 @@ class ArrowMathStore {
     const ghostX = event.clientX - width / 2;
     const ghostY = event.clientY - CARD_HEIGHT / 2;
 
+    this.selectedSumId = null;
     this.bankDrag = {
       card: { place: card.place, digit: card.digit },
       pointerId: event.pointerId,
@@ -541,6 +606,7 @@ class ArrowMathStore {
 
     if (!inside) {
       this.hover = null;
+      this.sumHover = null;
       return;
     }
 
@@ -555,8 +621,7 @@ class ArrowMathStore {
       'stack',
       9999,
     );
-    const candidate = findDropCandidate(preview.cards, pieceBounds(preview), this.pieces);
-    this.hover = this.haloFor(candidate);
+    this.aimAt(preview);
   }
 
   /**
@@ -580,6 +645,7 @@ class ArrowMathStore {
       width: layout.width,
       height: CARD_HEIGHT,
       pieces: this.pieces,
+      obstacles: this.sumBounds(),
       canvas: this.canvas,
     });
     const piece = makePiece([incoming], spot.x, spot.y, 'stack', this.maxZ() + 1);
@@ -601,6 +667,7 @@ class ArrowMathStore {
     target.y = position.y;
     this.applySpring(target, 'default');
     this.fitPieceInCanvas(target);
+    this.settleSums();
     this.bringToFront(target);
     this.hoveredId = target.id;
     this.intent = null;
@@ -630,6 +697,13 @@ class ArrowMathStore {
     );
 
     const preview = makePiece([incoming], canvasX, canvasY, 'stack', this.maxZ() + 1);
+    const slot = findSumSlot(pieceBounds(preview), this.sums);
+    if (slot) {
+      this.pieces.push(preview);
+      this.attachPiece(preview, slot.sum, slot.side);
+      return;
+    }
+
     const candidate = findDropCandidate(preview.cards, pieceBounds(preview), this.pieces);
 
     if (candidate && candidate.kind !== 'conflict') {
@@ -699,6 +773,7 @@ class ArrowMathStore {
     if (!piece || !piece.cards.some((card) => card.id === cardId)) return;
 
     const doubleClick = this.notePointerDown(piece, event);
+    this.selectedSumId = null;
 
     if (kind === 'peel' && piece.cards.length > 1) {
       this.beginPeelDrag(event, piece, cardId, doubleClick);
@@ -714,6 +789,7 @@ class ArrowMathStore {
     const piece = this.pieces.find((entry) => entry.id === pieceId);
     if (!piece) return;
     this.lastPointerDown = null;
+    this.selectedSumId = null;
     this.beginMoveDrag(event, piece, null, true, false);
   }
 
@@ -889,6 +965,8 @@ class ArrowMathStore {
     source.y = removal.y;
     source.mode = removal.mode;
     this.applySpring(source, 'default');
+    // A plus keeps its number snug against it as the number shrinks.
+    this.settleSums();
 
     const detached = makePiece([card], visualX, visualY, 'stack', this.maxZ() + 1);
     this.pieces.push(detached);
@@ -935,7 +1013,11 @@ class ArrowMathStore {
       return;
     }
 
-    if (drag.moved) this.lastPointerDown = null;
+    if (drag.moved) {
+      this.lastPointerDown = null;
+      // Pulling a whole number away unhooks it from its plus.
+      this.detachPiece(piece.id);
+    }
 
     piece.x = clamp(
       drag.startPiece.x + dx,
@@ -948,6 +1030,18 @@ class ArrowMathStore {
       Math.max(CANVAS_PADDING, this.canvas.height - CARD_HEIGHT - CANVAS_PADDING),
     );
 
+    this.aimAt(piece);
+  }
+
+  /** Shows where a dragged piece would land: a plus side or another piece. */
+  private aimAt(piece: Piece): void {
+    const slot = findSumSlot(pieceBounds(piece), this.sums);
+    if (slot) {
+      this.sumHover = { sumId: slot.sum.id, side: slot.side };
+      this.hover = null;
+      return;
+    }
+    this.sumHover = null;
     const candidate = findDropCandidate(piece.cards, pieceBounds(piece), this.pieces, [piece.id]);
     this.hover = this.haloFor(candidate);
   }
@@ -957,6 +1051,7 @@ class ArrowMathStore {
     if (!drag) return;
     this.drag = null;
     this.hover = null;
+    this.sumHover = null;
     this.intent = null;
     const piece = this.pieces.find((entry) => entry.id === drag.pieceId);
     if (!piece) return;
@@ -972,6 +1067,12 @@ class ArrowMathStore {
     }
 
     this.lastPointerDown = null;
+    const slot = findSumSlot(pieceBounds(piece), this.sums);
+    if (slot) {
+      this.attachPiece(piece, slot.sum, slot.side);
+      return;
+    }
+
     const candidate = findDropCandidate(piece.cards, pieceBounds(piece), this.pieces, [piece.id]);
 
     if (candidate) {
@@ -1024,6 +1125,7 @@ class ArrowMathStore {
     // The anchor rule grows a stack leftwards and a chain rightwards, so a
     // merge at the workbench edge can reach past it. Staying visible wins.
     this.fitPieceInCanvas(target);
+    this.settleSums();
 
     this.pieces = this.pieces.filter((piece) => piece.id !== source.id);
     this.bringToFront(target);
@@ -1087,14 +1189,23 @@ class ArrowMathStore {
     }
     if (this.drag && event.pointerId === this.drag.pointerId) {
       this.updatePieceDrag(event.clientX, event.clientY);
+      return;
+    }
+    if (this.sumDrag && event.pointerId === this.sumDrag.pointerId) {
+      this.updateSumDrag(event.clientX, event.clientY);
     }
   };
 
   handlePointerUp = (event: PointerEvent): void => {
+    if (this.sumDrag && event.pointerId === this.sumDrag.pointerId) {
+      this.endSumDrag();
+      return;
+    }
     if (this.bankDrag && event.pointerId === this.bankDrag.pointerId) {
       const drag = this.bankDrag;
       this.bankDrag = null;
       this.hover = null;
+      this.sumHover = null;
       this.intent = null;
       if (drag.active) {
         this.dropBankCard(drag, event.clientX, event.clientY);
@@ -1124,6 +1235,10 @@ class ArrowMathStore {
 
   handlePointerCancel = (event: PointerEvent): void => {
     this.intentRefreshToken += 1;
+    if (this.sumDrag && event.pointerId === this.sumDrag.pointerId) {
+      this.endSumDrag();
+      return;
+    }
     if (this.bankDrag && event.pointerId === this.bankDrag.pointerId) {
       this.bankDrag = null;
       this.hover = null;
@@ -1141,6 +1256,8 @@ class ArrowMathStore {
   cancelInteraction(): void {
     this.intent = null;
     this.lastPointerDown = null;
+    this.sumHover = null;
+    if (this.sumDrag) this.endSumDrag();
     if (this.bankDrag) {
       this.bankDrag = null;
       this.hover = null;
@@ -1155,15 +1272,219 @@ class ArrowMathStore {
   }
 
   // ---------------------------------------------------------------------------
+  // Addition
+  // ---------------------------------------------------------------------------
+
+  /** Puts a new, empty plus in clear space with room above it for the rows. */
+  addSum(): Sum {
+    this.measureCanvas();
+    const reserveLeft = SUM_SIDE_RESERVE + PLUS_GAP;
+    const spot = findFreeSpot({
+      width: reserveLeft + PLUS_SIZE + PLUS_GAP + SUM_SIDE_RESERVE,
+      height: SUM_ROWS_RESERVE + CARD_HEIGHT,
+      pieces: this.pieces,
+      obstacles: this.sumBounds(),
+      canvas: this.canvas,
+    });
+    const sum: Sum = {
+      id: makeId('sum'),
+      x: spot.x + reserveLeft,
+      y: spot.y + SUM_ROWS_RESERVE,
+      left: null,
+      right: null,
+      revealed: {},
+    };
+    this.sums.push(sum);
+    this.settleSum(sum);
+    this.selectSum(sum.id);
+    audio.add();
+    return sum;
+  }
+
+  removeSum(sumId: string): void {
+    const index = this.sums.findIndex((sum) => sum.id === sumId);
+    if (index < 0) return;
+    const removed = cloneSums([this.sums[index]])[0];
+    this.sums = this.sums.filter((sum) => sum.id !== sumId);
+    if (this.selectedSumId === sumId) this.selectedSumId = null;
+    audio.remove();
+    this.notify('Removed the plus. The numbers stay on the bench.', 'info', {
+      label: 'Undo',
+      run: () => {
+        // Numbers moved or joined to another plus in the meantime stay put.
+        for (const side of ['left', 'right'] as const) {
+          const id = removed[side];
+          if (id && (!this.pieces.some((piece) => piece.id === id) || this.isAttached(id))) {
+            removed[side] = null;
+          }
+        }
+        this.sums.splice(Math.min(index, this.sums.length), 0, removed);
+        this.settleSum(this.sums.find((sum) => sum.id === removed.id)!);
+        audio.add();
+      },
+    });
+  }
+
+  /** Shows or hides one place row's answer. */
+  toggleReveal(sumId: string, place: Place): void {
+    const sum = this.sums.find((entry) => entry.id === sumId);
+    if (!sum) return;
+    const left = this.pieceById(sum.left);
+    const right = this.pieceById(sum.right);
+    if (!left || !right) return;
+    const row = placeRows(left.cards, right.cards).find((entry) => entry.place === place);
+    if (!row) return;
+
+    if (sum.revealed[place] === row.key) {
+      delete sum.revealed[place];
+      audio.stack();
+    } else {
+      sum.revealed[place] = row.key;
+      audio.expand();
+    }
+  }
+
+  beginSumDrag(event: PointerEvent, sumId: string): void {
+    if (this.drag || this.bankDrag || this.sumDrag) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const sum = this.sums.find((entry) => entry.id === sumId);
+    if (!sum) return;
+    this.measureCanvas();
+
+    this.selectSum(sum.id);
+    this.hover = null;
+    this.intent = null;
+    this.lastPointerDown = null;
+    for (const id of [sum.left, sum.right]) {
+      const piece = this.pieceById(id);
+      if (piece) this.bringToFront(piece);
+    }
+
+    this.sumDrag = {
+      sumId: sum.id,
+      pointerId: event.pointerId,
+      startPointer: this.clientToCanvas(event.clientX, event.clientY),
+      startSum: { x: sum.x, y: sum.y },
+      moved: false,
+    };
+    audio.pickup();
+    event.preventDefault();
+  }
+
+  private updateSumDrag(clientX: number, clientY: number): void {
+    const drag = this.sumDrag;
+    if (!drag) return;
+    const sum = this.sums.find((entry) => entry.id === drag.sumId);
+    if (!sum) {
+      this.sumDrag = null;
+      return;
+    }
+
+    const pointer = this.clientToCanvas(clientX, clientY);
+    const dx = pointer.x - drag.startPointer.x;
+    const dy = pointer.y - drag.startPointer.y;
+    if (!drag.moved && Math.hypot(dx, dy) <= 4) return;
+    drag.moved = true;
+
+    sum.x = drag.startSum.x + dx;
+    sum.y = drag.startSum.y + dy;
+    this.settleSum(sum);
+  }
+
+  private endSumDrag(): void {
+    const drag = this.sumDrag;
+    if (!drag) return;
+    this.sumDrag = null;
+    const sum = this.sums.find((entry) => entry.id === drag.sumId);
+    if (!sum || !drag.moved) return;
+
+    if (this.snapToGrid) {
+      sum.x = snapToGrid(sum.x);
+      sum.y = snapToGrid(sum.y);
+    }
+    this.settleSum(sum);
+  }
+
+  private attachPiece(piece: Piece, sum: Sum, side: SumSide): void {
+    sum[side] = piece.id;
+    this.applySpring(piece, 'default');
+    this.settleSum(sum);
+    this.bringToFront(piece);
+    this.hover = null;
+    this.sumHover = null;
+    this.selectedId = piece.id;
+    this.hoveredId = piece.id;
+    audio.snap();
+  }
+
+  private detachPiece(pieceId: string): void {
+    const sum = this.sumOf(pieceId);
+    if (!sum) return;
+    const side = attachedSide(sum, pieceId);
+    if (side) sum[side] = null;
+    audio.peel();
+  }
+
+  private pieceById(id: string | null): Piece | null {
+    if (!id) return null;
+    return this.pieces.find((piece) => piece.id === id) ?? null;
+  }
+
+  private sumBounds(): Bounds[] {
+    return this.sums.map(
+      (sum) => sumLayout(sum, this.pieceById(sum.left), this.pieceById(sum.right)).bounds,
+    );
+  }
+
+  /**
+   * Keeps a plus and its rows on the canvas and moves its numbers into
+   * place beside it. Sides whose piece is gone are emptied.
+   */
+  private settleSum(sum: Sum): void {
+    let left = this.pieceById(sum.left);
+    let right = this.pieceById(sum.right);
+    if (sum.left && !left) sum.left = null;
+    if (sum.right && !right) sum.right = null;
+
+    let layout = sumLayout(sum, left, right);
+    const dx = clampShift(layout.bounds.x, layout.bounds.width, this.canvas.width);
+    const dy = clampShift(layout.bounds.y, layout.bounds.height, this.canvas.height);
+    if (dx !== 0 || dy !== 0) {
+      sum.x += dx;
+      sum.y += dy;
+      layout = sumLayout(sum, left, right);
+    }
+
+    if (left && layout.leftPosition) {
+      left.x = layout.leftPosition.x;
+      left.y = layout.leftPosition.y;
+    }
+    if (right && layout.rightPosition) {
+      right.x = layout.rightPosition.x;
+      right.y = layout.rightPosition.y;
+    }
+  }
+
+  private settleSums(): void {
+    for (const sum of this.sums) this.settleSum(sum);
+  }
+
+  // ---------------------------------------------------------------------------
   // Group & canvas actions
   // ---------------------------------------------------------------------------
 
   selectPiece(id: string | null): void {
     this.selectedId = id;
+    if (id) this.selectedSumId = null;
     if (id) {
       const piece = this.pieces.find((entry) => entry.id === id);
       if (piece) this.bringToFront(piece);
     }
+  }
+
+  selectSum(id: string): void {
+    this.selectedId = null;
+    this.selectedSumId = id;
   }
 
   setHoveredPiece(id: string | null): void {
@@ -1202,6 +1523,7 @@ class ArrowMathStore {
     if (!piece || piece.cards.length < 2) return;
     piece.mode = piece.mode === 'stack' ? 'expand' : 'stack';
     this.fitPieceInCanvas(piece);
+    this.settleSums();
     this.selectedId = piece.id;
     this.intent = null;
     this.lastPointerDown = null;
@@ -1223,6 +1545,7 @@ class ArrowMathStore {
     if (this.intent?.pieceId === pieceId) this.intent = null;
     this.lastPointerDown = null;
     this.markRemoved(pieceId);
+    this.settleSums();
     audio.remove();
     this.notify(`Removed ${formatNumber(pieceValue(removed.cards))}.`, 'info', {
       label: 'Undo',
@@ -1236,6 +1559,7 @@ class ArrowMathStore {
 
   clearSelection(): void {
     this.selectedId = null;
+    this.selectedSumId = null;
     this.intent = null;
     this.lastPointerDown = null;
     // A tap on empty canvas should also dismiss a toolbar that was kept open
@@ -1258,7 +1582,10 @@ class ArrowMathStore {
       return;
     }
 
-    const ordered = [...this.pieces].sort((a, b) => pieceValue(b.cards) - pieceValue(a.cards));
+    // Numbers on a plus stay with it; only loose pieces are tidied.
+    const ordered = this.pieces
+      .filter((piece) => !this.isAttached(piece.id))
+      .sort((a, b) => pieceValue(b.cards) - pieceValue(a.cards));
     const pad = 32;
     const gap = 34;
     const rowGap = 58;
@@ -1287,17 +1614,19 @@ class ArrowMathStore {
   }
 
   resetCanvas(): void {
-    if (this.pieces.length === 0) {
+    if (this.pieces.length === 0 && this.sums.length === 0) {
       this.notify('The workbench is already clear.', 'info');
       audio.click();
       return;
     }
-    this.resetSnapshot = clonePieces(this.pieces);
+    this.resetSnapshot = { pieces: clonePieces(this.pieces), sums: cloneSums(this.sums) };
     // The pieces are leaving the board, so their bounce timers should not
     // outlive them and reveal a late "settle" on a piece that no longer exists.
     for (const piece of this.pieces) this.markRemoved(piece.id);
     this.pieces = [];
+    this.sums = [];
     this.selectedId = null;
+    this.selectedSumId = null;
     this.hoveredId = null;
     this.hover = null;
     this.intent = null;
@@ -1307,7 +1636,8 @@ class ArrowMathStore {
       label: 'Undo',
       run: () => {
         if (!this.resetSnapshot) return;
-        this.pieces = clonePieces(this.resetSnapshot);
+        this.pieces = clonePieces(this.resetSnapshot.pieces);
+        this.sums = cloneSums(this.resetSnapshot.sums);
         this.resetSnapshot = null;
         audio.tidy();
       },
@@ -1335,6 +1665,7 @@ class ArrowMathStore {
       width: layout.width + (mode === 'expand' && cards.length > 1 ? RESULT_RESERVE : 0),
       height: layout.height,
       pieces: this.pieces,
+      obstacles: this.sumBounds(),
       canvas: this.canvas,
     });
     const piece = makePiece(cards, spot.x, spot.y, mode, this.maxZ() + 1);
@@ -1388,6 +1719,7 @@ class ArrowMathStore {
       width: blockWidth,
       height: blockHeight,
       pieces: this.pieces,
+      obstacles: this.sumBounds(),
       canvas: this.canvas,
     });
 
@@ -1515,15 +1847,23 @@ class ArrowMathStore {
     // Escape must always be able to cancel a drag, even if a toolbar button
     // happens to hold focus while a pointer gesture is in progress.
     if (event.key === 'Escape') {
-      if (this.drag || this.bankDrag) {
+      if (this.drag || this.bankDrag || this.sumDrag) {
         this.cancelInteraction();
-      } else if (this.selectedId) {
+      } else if (this.selectedId || this.selectedSumId) {
         this.clearSelection();
       }
       return;
     }
 
     if (isTypingTarget(event.target)) return;
+
+    if (!this.selectedId && this.selectedSumId) {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        this.removeSum(this.selectedSumId);
+      }
+      return;
+    }
 
     if (!this.selectedId) return;
     const piece = this.selectedPiece;
@@ -1545,6 +1885,15 @@ class ArrowMathStore {
 
     if (dx !== 0 || dy !== 0) {
       event.preventDefault();
+      // A number on a plus moves the whole sum with it.
+      const sum = this.sumOf(piece.id);
+      if (sum) {
+        sum.x += dx;
+        sum.y += dy;
+        this.settleSum(sum);
+        audio.click();
+        return;
+      }
       const bounds = pieceBounds(piece);
       piece.x = clamp(
         piece.x + dx,

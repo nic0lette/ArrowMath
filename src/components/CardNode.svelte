@@ -16,6 +16,8 @@
     mode: PieceMode;
     grouped: boolean;
     dragging: boolean;
+    /** Moving with a dragged plus: follow it without a spring. */
+    carried: boolean;
     visibleWidth: number;
     spring: SpringConfig;
   }
@@ -30,6 +32,7 @@
     mode,
     grouped,
     dragging,
+    carried,
     visibleWidth,
     spring,
   }: Props = $props();
@@ -111,7 +114,7 @@
   style:z-index={z}
   style:width="{width}px"
   style:height="68px"
-  use:cardMotion={{ x, y, immediate: dragging, spring }}
+  use:cardMotion={{ x, y, immediate: dragging || carried, spring }}
   role="button"
   tabindex="0"
   aria-label="{card.digit} {placeTierName} card, {value}. {actionLabel}"
