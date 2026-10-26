@@ -188,45 +188,59 @@ export interface SeedPiece {
   mode?: 'stack' | 'expand';
 }
 
+export interface SeedBoard {
+  id: string;
+  name: string;
+  pieces: SeedPiece[];
+}
+
 /**
- * Opens the app with a saved board (and optional preferences) already in
+ * Opens the app with a saved lesson (and optional preferences) already in
  * storage, so a test can start with cards at exact positions such as the
  * workbench edges. Each call seeds exactly once, before the app loads, so a
  * test can load once to measure the canvas and then seed again.
  */
 let seedCount = 0;
 
-export async function gotoSeeded(
+export async function gotoLesson(
   page: Page,
-  pieces: SeedPiece[],
+  boards: SeedBoard[],
   preferences?: Record<string, unknown>,
+  activeBoardId = boards[0].id,
 ): Promise<void> {
   seedCount += 1;
   const flag = `arrow-math:test-seeded-${seedCount}`;
   await page.addInitScript(
-    ([pieces, preferences, flag]) => {
+    ([boards, preferences, flag, activeBoardId]) => {
       if (sessionStorage.getItem(flag)) return;
       sessionStorage.setItem(flag, '1');
       localStorage.setItem(
         'arrow-math:lesson',
         JSON.stringify({
           version: 2,
-          activeBoardId: 'board-1',
-          boards: [
-            {
-              id: 'board-1',
-              name: 'Board 1',
-              pieces: pieces.map((piece, index) => ({ mode: 'stack', z: index + 1, ...piece })),
-            },
-          ],
+          activeBoardId,
+          boards: boards.map((board) => ({
+            ...board,
+            pieces: board.pieces.map((piece, index) => ({ mode: 'stack', z: index + 1, ...piece })),
+          })),
         }),
       );
       if (preferences) localStorage.setItem('arrow-math:preferences', JSON.stringify(preferences));
     },
-    [pieces, preferences, flag] as const,
+    [boards, preferences, flag, activeBoardId] as const,
   );
   await page.goto('/');
-  await expect(workbench(page)).toHaveAttribute('data-piece-count', String(pieces.length));
+  const active = boards.find((board) => board.id === activeBoardId) ?? boards[0];
+  await expect(workbench(page)).toHaveAttribute('data-piece-count', String(active.pieces.length));
+}
+
+/** Opens the app with a single saved board. */
+export async function gotoSeeded(
+  page: Page,
+  pieces: SeedPiece[],
+  preferences?: Record<string, unknown>,
+): Promise<void> {
+  await gotoLesson(page, [{ id: 'board-1', name: 'Board 1', pieces }], preferences);
 }
 
 /** The card layer is the coordinate system pieces are clamped to. */

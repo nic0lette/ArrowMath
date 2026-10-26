@@ -147,6 +147,7 @@
     role="region"
     aria-label="Arrow card workbench"
     data-workbench
+    data-board-id={game.activeBoardId}
     data-card-count={game.cardCount}
     data-piece-count={game.pieces.length}
     data-sum-count={game.sums.length}

@@ -27,6 +27,15 @@ import {
   type Lesson,
   type LessonBoard,
 } from './boardStorage';
+import {
+  addBoard,
+  clonePieces,
+  cloneSums,
+  duplicateBoard,
+  neighbourBoardId,
+  removeBoard,
+  renameBoard,
+} from './lesson';
 import { freezeCardMotion } from './cardMotion';
 import {
   CANVAS_PADDING,
@@ -187,17 +196,6 @@ function makeId(prefix: string): string {
   return `${prefix}-${random}`;
 }
 
-function clonePieces(pieces: Piece[]): Piece[] {
-  return pieces.map((piece) => ({
-    ...piece,
-    cards: piece.cards.map((card) => ({ ...card })),
-  }));
-}
-
-function cloneSums(sums: Sum[]): Sum[] {
-  return sums.map((sum) => ({ ...sum, revealed: { ...sum.revealed } }));
-}
-
 /** Width of the room an empty plus is given: a few cards each side. */
 const SUM_SIDE_RESERVE = 180;
 /** Height of four place rows, kept clear above a new plus. */
@@ -236,6 +234,12 @@ function copyWidth(cards: Array<{ place: Place }>): number {
 function duplicatePlaceMessage(place: Place | null): string {
   const column = place ? placeTier(place) : 'place value';
   return `The ${column} column already has a card — same place values bounce apart. Pull the old card out from its digit end to change it.`;
+}
+
+/** A field where Page Up and Page Down belong to the text, not the lesson. */
+function isTextField(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -472,14 +476,90 @@ class ArrowMathStore {
     };
   }
 
-  /** The lesson as it stands, with the live pieces in the active board. */
+  /** The lesson as it stands, with a copy of the live pieces in the active board. */
   private currentLesson(): Lesson {
     return {
       activeBoardId: this.activeBoardId,
       boards: this.boards.map((board) =>
-        board.id === this.activeBoardId ? { ...board, pieces: this.pieces, sums: this.sums } : board,
+        board.id === this.activeBoardId
+          ? { ...board, pieces: clonePieces(this.pieces), sums: cloneSums(this.sums) }
+          : board,
       ),
     };
+  }
+
+  /**
+   * Makes `next` the lesson. When the active board changes, everything in
+   * flight on the old board (a drag, a selection, a toast's Undo) is dropped
+   * first, so none of it lands on the new one.
+   */
+  private applyLesson(next: Lesson): void {
+    const changing = next.activeBoardId !== this.activeBoardId;
+    if (changing) this.leaveBoard();
+    this.boards = next.boards;
+    this.activeBoardId = next.activeBoardId;
+    if (!changing) return;
+    const active = next.boards.find((board) => board.id === next.activeBoardId);
+    this.pieces = clonePieces(active?.pieces ?? []);
+    this.sums = cloneSums(active?.sums ?? []);
+    this.keepPiecesInView();
+  }
+
+  private leaveBoard(): void {
+    this.cancelInteraction();
+    this.clearSelection();
+    this.hover = null;
+    for (const piece of this.pieces) this.markRemoved(piece.id);
+    this.resetSnapshot = null;
+    this.dismissToast();
+  }
+
+  get activeBoard(): LessonBoard | undefined {
+    return this.boards.find((board) => board.id === this.activeBoardId);
+  }
+
+  switchBoard(id: string): void {
+    if (id === this.activeBoardId || !this.boards.some((board) => board.id === id)) return;
+    this.applyLesson({ ...this.currentLesson(), activeBoardId: id });
+  }
+
+  /** Opens the next (1) or previous (-1) board; nothing happens past either end. */
+  stepBoard(delta: 1 | -1): void {
+    const id = neighbourBoardId(this.currentLesson(), delta);
+    if (id) this.switchBoard(id);
+  }
+
+  addBoard(): void {
+    this.applyLesson(addBoard(this.currentLesson(), makeId('board')));
+  }
+
+  duplicateBoard(id = this.activeBoardId): void {
+    this.applyLesson(duplicateBoard(this.currentLesson(), id, makeId('board')));
+  }
+
+  renameBoard(id: string, name: string): void {
+    this.applyLesson(renameBoard(this.currentLesson(), id, name));
+  }
+
+  removeBoard(id: string): void {
+    const before = this.currentLesson();
+    const index = before.boards.findIndex((board) => board.id === id);
+    const next = removeBoard(before, id);
+    if (next === before) return;
+    const removed = before.boards[index];
+    const wasActive = before.activeBoardId === id;
+    this.applyLesson(next);
+    audio.click();
+    this.notify(`Deleted ${removed.name}.`, 'info', {
+      label: 'Undo',
+      run: () => {
+        // Put back only the deleted board, so changes made since stay.
+        const now = this.currentLesson();
+        const boards = [...now.boards];
+        boards.splice(Math.min(index, boards.length), 0, removed);
+        this.applyLesson({ boards, activeBoardId: wasActive ? removed.id : now.activeBoardId });
+      },
+    });
   }
 
   /**
@@ -2038,6 +2118,13 @@ class ArrowMathStore {
       } else if (this.selectedId || this.selectedSumId) {
         this.clearSelection();
       }
+      return;
+    }
+
+    // A presentation clicker sends Page Down and Page Up, whatever holds focus.
+    if ((event.key === 'PageDown' || event.key === 'PageUp') && !isTextField(event.target)) {
+      event.preventDefault();
+      this.stepBoard(event.key === 'PageDown' ? 1 : -1);
       return;
     }
 
