@@ -59,6 +59,8 @@ export interface Sum {
    * for. Changing a number changes the key, which hides the answer again.
    */
   revealed: Partial<Record<Place, string>>;
+  /** Set when the total's "=" has been pressed, keyed like `revealed`. */
+  totalRevealed?: string;
 }
 
 export interface PlaceRow {
@@ -359,4 +361,13 @@ export function attachedSide(sum: Sum, pieceId: string): SumSide | null {
 
 export function isRevealed(sum: Sum, row: PlaceRow): boolean {
   return sum.revealed[row.place] === row.key;
+}
+
+/** Identifies the two numbers a total was revealed for. */
+export function totalKey(left: Piece, right: Piece): string {
+  return `${pieceValue(left.cards)}+${pieceValue(right.cards)}`;
+}
+
+export function isTotalRevealed(sum: Sum, left: Piece | null, right: Piece | null): boolean {
+  return Boolean(left && right && sum.totalRevealed === totalKey(left, right));
 }

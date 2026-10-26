@@ -33,6 +33,7 @@ interface StoredSum {
   left: string | null;
   right: string | null;
   revealed: Record<string, string>;
+  totalRevealed?: string;
 }
 
 export interface StoredBoard {
@@ -76,6 +77,7 @@ export function serializeBoard(pieces: Piece[], sums: Sum[] = []): StoredBoard {
       left: sum.left,
       right: sum.right,
       revealed: { ...sum.revealed },
+      ...(sum.totalRevealed ? { totalRevealed: sum.totalRevealed } : {}),
     })),
   };
 }
@@ -134,7 +136,7 @@ export function deserializeBoard(raw: unknown): Piece[] {
 
 function parseSum(input: unknown, pieceIds: Set<string>, attached: Set<string>): Sum | null {
   if (!input || typeof input !== 'object') return null;
-  const { id, x, y, left, right, revealed } = input as StoredSum;
+  const { id, x, y, left, right, revealed, totalRevealed } = input as StoredSum;
   if (typeof id !== 'string' || id.length === 0) return null;
 
   // A side points at a piece that must exist and sit on only one plus.
@@ -159,6 +161,7 @@ function parseSum(input: unknown, pieceIds: Set<string>, attached: Set<string>):
     left: side(left),
     right: side(right),
     revealed: parsedRevealed,
+    ...(typeof totalRevealed === 'string' ? { totalRevealed } : {}),
   };
 }
 

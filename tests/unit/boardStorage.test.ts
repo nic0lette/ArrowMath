@@ -176,6 +176,20 @@ describe('sums', () => {
     expect(sums[1].revealed).toEqual({});
   });
 
+  it('round-trips a revealed total and drops one that is not text', () => {
+    const stored = serializeBoard(
+      [piece('a', [card(1, 4)], 0, 0), piece('b', [card(1, 8)], 0, 0)],
+      [{ id: 's', x: 0, y: 0, left: 'a', right: 'b', revealed: {}, totalRevealed: '4+8' }],
+    );
+    expect(deserializeSums(JSON.parse(JSON.stringify(stored)), ids)[0].totalRevealed).toBe('4+8');
+
+    const [bad] = deserializeSums(
+      { sums: [{ id: 's', x: 0, y: 0, left: 'a', right: 'b', revealed: {}, totalRevealed: 12 }] },
+      ids,
+    );
+    expect(bad.totalRevealed).toBeUndefined();
+  });
+
   it('treats a board saved before sums existed as having none', () => {
     expect(deserializeSums({ version: BOARD_VERSION, pieces: [] }, ids)).toEqual([]);
     expect(deserializeSums({ sums: [{ id: '' }, null, 'x'] }, ids)).toEqual([]);

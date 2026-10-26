@@ -1,7 +1,7 @@
 <script lang="ts">
   import ArrowCard from 'arrow-cards/svelte';
   import { game } from '../lib/state.svelte';
-  import { ROW_SCALE, isRevealed, sumLayout, type Sum } from '../lib/addition';
+  import { ROW_SCALE, isRevealed, isTotalRevealed, sumLayout, type Sum } from '../lib/addition';
   import { formatNumber, pieceValue } from '../lib/geometry';
 
   interface Props {
@@ -13,6 +13,7 @@
   const left = $derived(game.pieces.find((piece) => piece.id === sum.left) ?? null);
   const right = $derived(game.pieces.find((piece) => piece.id === sum.right) ?? null);
   const layout = $derived(sumLayout(sum, left, right));
+  const totalShown = $derived(isTotalRevealed(sum, left, right));
   const selected = $derived(game.selectedSumId === sum.id && !game.selectedId);
   const label = $derived(
     left && right
@@ -95,6 +96,60 @@
         <path d="M3.5 4.5h9M6.5 4.5V3.2c0-.39.31-.7.7-.7h1.6c.39 0 .7.31.7.7v1.3M5 4.5l.6 8.1c.03.5.45.9.96.9h2.88c.51 0 .93-.4.96-.9l.6-8.1" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
     </button>
+  {/if}
+
+  {#if layout.equals && layout.total && left && right}
+    {@const total = layout.total}
+    <button
+      class="row-equals total-equals"
+      class:shown={totalShown}
+      type="button"
+      aria-pressed={totalShown}
+      aria-label="{totalShown ? 'Hide' : 'Show'} {formatNumber(pieceValue(left.cards))} + {formatNumber(pieceValue(right.cards))}"
+      style:left="{layout.equals.x}px"
+      style:top="{layout.equals.y}px"
+      style:width="{layout.equals.width}px"
+      style:height="{layout.equals.height}px"
+      onpointerdown={(event) => event.stopPropagation()}
+      onclick={(event) => {
+        event.stopPropagation();
+        game.toggleTotal(sum.id);
+      }}>=</button
+    >
+
+    {#if totalShown}
+      <div class="sum-total" data-total={total.value}>
+        {#if total.overflow !== null}
+          <span
+            class="row-overflow total-overflow"
+            style:left="{total.x}px"
+            style:top="{total.y}px"
+            style:width="{total.width}px"
+            style:height="{total.height}px">{formatNumber(total.overflow)}</span
+          >
+        {:else}
+          {#each total.cards as entry (entry.place)}
+            <div
+              class="mini-card"
+              data-total-card
+              data-place={entry.place}
+              data-digit={entry.digit}
+              style:left="{entry.x}px"
+              style:top="{entry.y}px"
+              style:width="{entry.width}px"
+              style:height="{entry.height}px"
+            >
+              <ArrowCard
+                place={entry.place}
+                digit={entry.digit}
+                theme={game.theme}
+                idPrefix="sum-{sum.id}-total-{entry.place}"
+              />
+            </div>
+          {/each}
+        {/if}
+      </div>
+    {/if}
   {/if}
 
   {#each layout.rows as row (row.place)}
@@ -335,6 +390,11 @@
     color: var(--accent);
   }
 
+  .total-equals {
+    border-radius: 12px;
+    font-size: 24px;
+  }
+
   .row-equals.shown {
     border-color: transparent;
     background: var(--ink);
@@ -358,6 +418,11 @@
     font-size: 18px;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
+  }
+
+  .total-overflow {
+    justify-content: flex-end;
+    font-size: 26px;
   }
 
   @keyframes row-in {

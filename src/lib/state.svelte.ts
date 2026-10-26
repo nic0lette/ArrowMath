@@ -7,6 +7,8 @@ import {
   ROWS_OFFSET,
   attachedSide,
   findSumSlot,
+  isTotalRevealed,
+  totalKey,
   placeRows,
   sumLayout,
   type Sum,
@@ -1323,6 +1325,23 @@ class ArrowMathStore {
         audio.add();
       },
     });
+  }
+
+  /** Shows or hides the whole total beside the numbers. */
+  toggleTotal(sumId: string): void {
+    const sum = this.sums.find((entry) => entry.id === sumId);
+    if (!sum) return;
+    const left = this.pieceById(sum.left);
+    const right = this.pieceById(sum.right);
+    if (!left || !right) return;
+
+    if (isTotalRevealed(sum, left, right)) {
+      delete sum.totalRevealed;
+      audio.stack();
+    } else {
+      sum.totalRevealed = totalKey(left, right);
+      audio.expand();
+    }
   }
 
   /** Shows or hides one place row's answer. */

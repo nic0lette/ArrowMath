@@ -106,12 +106,12 @@ test.describe('addition', () => {
     }
 
     const centers = await page
-      .locator('.row-equals')
+      .locator('.row-equals, .total-equals')
       .evaluateAll((nodes) => nodes.map((node) => {
         const box = node.getBoundingClientRect();
         return box.left + box.width / 2;
       }));
-    expect(centers).toHaveLength(3);
+    expect(centers).toHaveLength(4);
     for (const center of centers) expect(center).toBeCloseTo(centers[0], 0);
   });
 
@@ -143,6 +143,38 @@ test.describe('addition', () => {
 
     await row.getByRole('button', { name: 'Hide 4 + 8' }).click();
     await expect(results).toHaveCount(0);
+  });
+
+  test('the = beside the numbers shows the total as full-size cards', async ({ page }) => {
+    await gotoSeeded(page, [stack('a', 127, 40, 40), stack('b', 2385, 900, 40)]);
+    await addPlus(page);
+    await dropIntoSlot(page, 'a', 'left');
+    await dropIntoSlot(page, 'b', 'right');
+
+    const total = page.locator('.sum-total');
+    await expect(total).toHaveCount(0);
+    await page.getByRole('button', { name: 'Show 127 + 2,385' }).click();
+
+    const cards = total.locator('[data-total-card]');
+    expect(
+      await cards.evaluateAll((nodes) =>
+        nodes.map((node) => [node.getAttribute('data-place'), node.getAttribute('data-digit')]),
+      ),
+    ).toEqual([
+      ['1000', '2'],
+      ['100', '5'],
+      ['10', '1'],
+      ['1', '2'],
+    ]);
+    // Full size, and the ones answer above ends at the same tip.
+    const thousands = await boxOf(cards.first());
+    expect(thousands.height).toBeCloseTo(68, 0);
+    await page.locator('.sum-row[data-row-place="1"]').getByRole('button', { name: 'Show 7 + 5' }).click();
+    const onesAnswer = await boxOf(page.locator('.sum-row[data-row-place="1"] [data-result]').last());
+    expect(onesAnswer.x + onesAnswer.width).toBeCloseTo(thousands.x + thousands.width, 0);
+
+    await page.getByRole('button', { name: 'Hide 127 + 2,385' }).click();
+    await expect(total).toHaveCount(0);
   });
 
   test('a place one number leaves out shows as a zero card', async ({ page }) => {

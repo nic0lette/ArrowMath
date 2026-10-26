@@ -6,6 +6,8 @@ import {
   ROW_ITEM_GAP,
   ROW_SCALE,
   findSumSlot,
+  isTotalRevealed,
+  totalKey,
   placeRows,
   rowResult,
   sumLayout,
@@ -251,6 +253,17 @@ describe('sumLayout alignment', () => {
     for (const row of layout.rows) {
       expect(row.leftCard.width).toBe(getArrowCardWidth(row.place) * ROW_SCALE);
     }
+  });
+});
+
+describe('total reveal', () => {
+  it('is keyed by both numbers, so changing either hides the total again', () => {
+    const left = piece('a', cardsFor(127));
+    const right = piece('b', cardsFor(2385));
+    const shown = sum({ left: 'a', right: 'b', totalRevealed: totalKey(left, right) });
+    expect(isTotalRevealed(shown, left, right)).toBe(true);
+    expect(isTotalRevealed(shown, left, piece('b', cardsFor(2386)))).toBe(false);
+    expect(isTotalRevealed(sum({ left: 'a', right: 'b' }), left, right)).toBe(false);
   });
 });
 
