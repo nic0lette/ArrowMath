@@ -1,4 +1,4 @@
-import { CARD_HEIGHT, getArrowCardWidth } from 'arrow-cards';
+import { CARD_HEIGHT, getArrowCardWidth, type PlaceValue } from 'arrow-cards';
 import {
   SNAP_MIN_OVERLAP,
   layoutPiece,
@@ -37,18 +37,26 @@ export const ROWS_OFFSET = 24;
 export const ROW_PLUS_SIZE = 26;
 export const ROW_ITEM_GAP = 10;
 export const EQUALS_SIZE = 32;
-/** Room for a text result such as "11,000" that has no single card. */
-export const OVERFLOW_WIDTH = 92;
 /** The "=" on the numbers' line, between the right number and the total. */
 export const TOTAL_EQUALS_SIZE = 40;
 export const TOTAL_GAP = 14;
-/** Room for a total of 10,000 or more, shown as text at full size. */
-export const TOTAL_OVERFLOW_WIDTH = 132;
 /** The button above the plus that hides or shows the place rows. */
 export const TOGGLE_SIZE = 24;
 export const TOGGLE_GAP = 6;
 
 export type SumSide = 'left' | 'right';
+
+/**
+ * Answers can carry into a ten-thousands card (the biggest sum is 9,999 +
+ * 9,999 = 19,998). Real cards never have that place, so answers holding one
+ * cannot be copied onto the bench.
+ */
+export type AnswerPlace = PlaceValue;
+
+export interface AnswerCard {
+  place: AnswerPlace;
+  digit: number;
+}
 
 export interface Sum {
   id: string;
@@ -77,15 +85,10 @@ export interface PlaceRow {
 }
 
 export interface RowResult {
-  cards: Array<{ place: Place; digit: number }>;
-  /** Set when the answer needs a card larger than thousands. */
-  overflow: number | null;
+  cards: AnswerCard[];
 }
 
-export interface ResultCardGeometry extends Bounds {
-  place: Place;
-  digit: number;
-}
+export interface ResultCardGeometry extends Bounds, AnswerCard {}
 
 export interface RowGeometry extends PlaceRow {
   y: number;
@@ -96,15 +99,12 @@ export interface RowGeometry extends PlaceRow {
   equals: Bounds;
   result: Bounds;
   resultCards: ResultCardGeometry[];
-  overflow: number | null;
 }
 
 export interface TotalGeometry extends Bounds {
   value: number;
-  /** Full-size cards stacked on their arrow tips; empty when overflowing. */
+  /** Full-size cards stacked on their arrow tips. */
   cards: ResultCardGeometry[];
-  /** Set when the total needs a card larger than thousands. */
-  overflow: number | null;
 }
 
 export interface SumLayout {
@@ -146,24 +146,31 @@ export function placeRows(left: Card[], right: Card[]): PlaceRow[] {
   });
 }
 
-/** The cards that make one column's answer: 4 + 8 ones is a 10 stacked on a 2. */
+/**
+ * The cards that make one column's answer: 4 + 8 ones is a 10 stacked on a 2,
+ * and 5,000 + 6,000 is a 10,000 with a 1,000 on it.
+ */
 export function rowResult(place: Place, left: number, right: number): RowResult {
   const total = left + right;
-  if (total < 10) return { cards: [{ place, digit: total }], overflow: null };
-  if (place === 1000) return { cards: [], overflow: total * place };
+  if (total < 10) return { cards: [{ place, digit: total }] };
 
-  const cards: RowResult['cards'] = [{ place: (place * 10) as Place, digit: 1 }];
+  const cards: AnswerCard[] = [{ place: (place * 10) as AnswerPlace, digit: 1 }];
   if (total > 10) cards.push({ place, digit: total - 10 });
-  return { cards, overflow: null };
+  return { cards };
 }
 
 function pieceWidth(piece: Piece): number {
   return layoutPiece(piece.cards, piece.mode).width;
 }
 
-/** The cards for a whole total: 2,512 is a 2,000 with 500, 10 and 2 on it. */
-export function totalCards(value: number): Array<{ place: Place; digit: number }> {
-  return value === 0 ? [{ place: 1, digit: 0 }] : numberToCards(value);
+/**
+ * The cards for a whole total: 2,512 is a 2,000 with 500, 10 and 2 on it,
+ * and 11,012 starts with a 10,000.
+ */
+export function totalCards(value: number): AnswerCard[] {
+  if (value === 0) return [{ place: 1, digit: 0 }];
+  if (value < 10000) return numberToCards(value);
+  return [{ place: 10000, digit: 1 }, ...numberToCards(value - 10000)];
 }
 
 /**
@@ -238,11 +245,8 @@ export function sumLayout(sum: Sum, left: Piece | null, right: Piece | null): Su
   const equalsCenter = equals.x + TOTAL_EQUALS_SIZE / 2;
 
   const value = pieceValue(left.cards) + pieceValue(right.cards);
-  const overflow = value > 9999 ? value : null;
-  const cards = overflow === null ? totalCards(value) : [];
-  const totalWidth = cards.length
-    ? Math.max(...cards.map((entry) => getArrowCardWidth(entry.place)))
-    : TOTAL_OVERFLOW_WIDTH;
+  const cards = totalCards(value);
+  const totalWidth = Math.max(...cards.map((entry) => getArrowCardWidth(entry.place)));
   const totalX = equals.x + TOTAL_EQUALS_SIZE + TOTAL_GAP;
   const totalTip = totalX + totalWidth;
   const total: TotalGeometry = {
@@ -251,7 +255,6 @@ export function sumLayout(sum: Sum, left: Piece | null, right: Piece | null): Su
     width: totalWidth,
     height: CARD_HEIGHT,
     value,
-    overflow,
     cards: cards.map((entry) => {
       const width = getArrowCardWidth(entry.place);
       return { ...entry, x: totalTip - width, y: sum.y, width, height: CARD_HEIGHT };
@@ -311,9 +314,9 @@ function layoutRows(sum: Sum, rows: PlaceRow[], columns: RowColumns): RowGeometr
     const answer = rowResult(row.place, row.left, row.right);
     // Results stack like a piece: arrow tips on the right, the widest card
     // underneath.
-    const resultWidth = answer.cards.length
-      ? Math.max(...answer.cards.map((entry) => getArrowCardWidth(entry.place) * ROW_SCALE))
-      : OVERFLOW_WIDTH;
+    const resultWidth = Math.max(
+      ...answer.cards.map((entry) => getArrowCardWidth(entry.place) * ROW_SCALE),
+    );
     const resultCards = answer.cards.map((entry) => {
       const width = getArrowCardWidth(entry.place) * ROW_SCALE;
       return { ...entry, x: columns.resultTip - width, y, width, height: ROW_HEIGHT };
@@ -339,7 +342,6 @@ function layoutRows(sum: Sum, rows: PlaceRow[], columns: RowColumns): RowGeometr
       },
       result: { x: columns.resultTip - resultWidth, y, width: resultWidth, height: ROW_HEIGHT },
       resultCards,
-      overflow: answer.overflow,
     };
   });
 }
@@ -415,4 +417,9 @@ export function totalKey(left: Piece, right: Piece): string {
 
 export function isTotalRevealed(sum: Sum, left: Piece | null, right: Piece | null): boolean {
   return Boolean(left && right && sum.totalRevealed === totalKey(left, right));
+}
+
+/** Whether an answer can be dragged out as real cards (no 10,000s card). */
+export function isCopyable(cards: AnswerCard[]): cards is Array<{ place: Place; digit: number }> {
+  return cards.length > 0 && cards.every((card) => card.place !== 10000);
 }

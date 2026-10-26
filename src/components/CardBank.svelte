@@ -1,11 +1,11 @@
 <script lang="ts">
   import ArrowCard from 'arrow-cards/svelte';
-  import { getArrowCardWidth, THEMES, type PlaceValue } from 'arrow-cards';
+  import { getArrowCardWidth, THEMES } from 'arrow-cards';
   import { game } from '../lib/state.svelte';
-  import { placeTier } from '../lib/geometry';
+  import { placeTier, type Place } from '../lib/geometry';
 
   const rows: Array<{
-    place: PlaceValue;
+    place: Place;
     title: string;
     hint: string;
   }> = [
@@ -21,7 +21,7 @@
   let makeValue = $state('');
   let scrollEdges = $state<Record<number, { left: boolean; right: boolean }>>({});
 
-  function watchScroll(node: HTMLDivElement, place: PlaceValue) {
+  function watchScroll(node: HTMLDivElement, place: Place) {
     let frame = 0;
     let destroyed = false;
 
@@ -145,18 +145,18 @@
     };
   }
 
-  function beginDrag(event: PointerEvent, place: PlaceValue, digit: number) {
+  function beginDrag(event: PointerEvent, place: Place, digit: number) {
     event.stopPropagation();
     game.beginBankDrag(event, { place, digit });
   }
 
-  function keyboardAdd(event: MouseEvent, place: PlaceValue, digit: number) {
+  function keyboardAdd(event: MouseEvent, place: Place, digit: number) {
     if (event.detail === 0) {
       game.addBankCard({ place, digit });
     }
   }
 
-  function scrollRow(place: PlaceValue, direction: number) {
+  function scrollRow(place: Place, direction: number) {
     const strip = strips[place];
     strip?.scrollBy({ left: direction * 280, behavior: 'smooth' });
   }

@@ -1,7 +1,15 @@
 <script lang="ts">
   import ArrowCard from 'arrow-cards/svelte';
   import { game } from '../lib/state.svelte';
-  import { ROW_SCALE, isRevealed, isTotalRevealed, sumLayout, type Sum } from '../lib/addition';
+  import {
+    ROW_SCALE,
+    isCopyable,
+    isRevealed,
+    isTotalRevealed,
+    sumLayout,
+    type AnswerCard,
+    type Sum,
+  } from '../lib/addition';
   import { formatNumber, pieceValue } from '../lib/geometry';
 
   interface Props {
@@ -20,6 +28,14 @@
       ? `Plus: ${formatNumber(pieceValue(left.cards))} + ${formatNumber(pieceValue(right.cards))}`
       : 'Plus. Drag a number to each side to add them.',
   );
+
+  const TOO_BIG_TO_COPY = 'This answer is too big to copy onto the bench';
+
+  /** Drags out a copy of an answer, unless it holds a 10,000s card. */
+  function copyAnswer(event: PointerEvent, cards: AnswerCard[]) {
+    event.stopPropagation();
+    if (isCopyable(cards)) game.beginAnswerDrag(event, cards);
+  }
 
   function hovering(side: 'left' | 'right'): boolean {
     return game.sumHover?.sumId === sum.id && game.sumHover.side === side;
@@ -146,41 +162,35 @@
     >
 
     {#if totalShown}
+      {@const copyable = isCopyable(total.cards)}
       <div class="sum-total" data-total={total.value}>
-        {#if total.overflow !== null}
-          <span
-            class="row-overflow total-overflow"
-            style:left="{total.x}px"
-            style:top="{total.y}px"
-            style:width="{total.width}px"
-            style:height="{total.height}px">{formatNumber(total.overflow)}</span
+        {#each total.cards as entry (entry.place)}
+          <div
+            class="mini-card"
+            class:copyable
+            data-total-card
+            role={copyable ? 'button' : 'img'}
+            tabindex="-1"
+            aria-label={copyable
+              ? `Drag out a copy of ${formatNumber(total.value)}`
+              : formatNumber(total.value)}
+            title={copyable ? 'Drag out a copy' : TOO_BIG_TO_COPY}
+            onpointerdown={(event) => copyAnswer(event, total.cards)}
+            data-place={entry.place}
+            data-digit={entry.digit}
+            style:left="{entry.x}px"
+            style:top="{entry.y}px"
+            style:width="{entry.width}px"
+            style:height="{entry.height}px"
           >
-        {:else}
-          {#each total.cards as entry (entry.place)}
-            <div
-              class="mini-card copyable"
-              data-total-card
-              role="button"
-              tabindex="-1"
-              aria-label="Drag out a copy of {formatNumber(total.value)}"
-              title="Drag out a copy"
-              onpointerdown={(event) => game.beginAnswerDrag(event, total.cards)}
-              data-place={entry.place}
-              data-digit={entry.digit}
-              style:left="{entry.x}px"
-              style:top="{entry.y}px"
-              style:width="{entry.width}px"
-              style:height="{entry.height}px"
-            >
-              <ArrowCard
-                place={entry.place}
-                digit={entry.digit}
-                theme={game.theme}
-                idPrefix="sum-{sum.id}-total-{entry.place}"
-              />
-            </div>
-          {/each}
-        {/if}
+            <ArrowCard
+              place={entry.place}
+              digit={entry.digit}
+              theme={game.theme}
+              idPrefix="sum-{sum.id}-total-{entry.place}"
+            />
+          </div>
+        {/each}
       </div>
     {/if}
   {/if}
@@ -237,42 +247,35 @@
       >
 
       {#if shown}
-        {#if row.overflow !== null}
-          <span
-            class="row-overflow"
+        {@const copyable = isCopyable(row.resultCards)}
+        {@const answer = formatNumber(row.left * row.place + row.right * row.place)}
+        {#each row.resultCards as result (result.place)}
+          <div
+            class="mini-card result"
+            class:copyable
             data-result
-            style:left="{row.result.x}px"
-            style:top="{row.result.y}px"
-            style:height="{row.result.height}px">{formatNumber(row.overflow)}</span
+            role={copyable ? 'button' : 'img'}
+            tabindex="-1"
+            aria-label={copyable ? `Drag out a copy of ${answer}` : answer}
+            title={copyable ? 'Drag out a copy' : TOO_BIG_TO_COPY}
+            onpointerdown={(event) => copyAnswer(event, row.resultCards)}
+            data-place={result.place}
+            data-digit={result.digit}
+            style:left="{result.x}px"
+            style:top="{result.y}px"
+            style:width="{result.width}px"
+            style:height="{result.height}px"
           >
-        {:else}
-          {#each row.resultCards as result (result.place)}
-            <div
-              class="mini-card result copyable"
-              data-result
-              role="button"
-              tabindex="-1"
-              aria-label="Drag out a copy of {formatNumber(row.left * row.place + row.right * row.place)}"
-              title="Drag out a copy"
-              onpointerdown={(event) => game.beginAnswerDrag(event, row.resultCards)}
-              data-place={result.place}
-              data-digit={result.digit}
-              style:left="{result.x}px"
-              style:top="{result.y}px"
-              style:width="{result.width}px"
-              style:height="{result.height}px"
-            >
-              <span class="mini-scale" style:transform="scale({ROW_SCALE})">
-                <ArrowCard
-                  place={result.place}
-                  digit={result.digit}
-                  theme={game.theme}
-                  idPrefix="sum-{sum.id}-{row.place}-result-{result.place}"
-                />
-              </span>
-            </div>
-          {/each}
-        {/if}
+            <span class="mini-scale" style:transform="scale({ROW_SCALE})">
+              <ArrowCard
+                place={result.place}
+                digit={result.digit}
+                theme={game.theme}
+                idPrefix="sum-{sum.id}-{row.place}-result-{result.place}"
+              />
+            </span>
+          </div>
+        {/each}
       {/if}
     </div>
   {/each}
@@ -418,9 +421,15 @@
     animation: row-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
+  /* Every answer takes the pointer so it can explain itself; only copyable
+     ones look grabbable. */
+  .result,
+  [data-total-card] {
+    pointer-events: auto;
+  }
+
   .copyable {
     cursor: grab;
-    pointer-events: auto;
     touch-action: none;
   }
 
@@ -488,25 +497,6 @@
   .row-equals:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
-  }
-
-  .row-overflow {
-    position: absolute;
-    display: inline-flex;
-    align-items: center;
-    padding: 0 10px;
-    border-radius: 10px;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    color: var(--ink);
-    font-size: 18px;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .total-overflow {
-    justify-content: flex-end;
-    font-size: 26px;
   }
 
   @keyframes row-in {

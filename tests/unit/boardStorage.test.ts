@@ -144,6 +144,28 @@ describe('zero cards', () => {
   });
 });
 
+describe('ten-thousands cards', () => {
+  it('are never loaded as a card on the bench; they only appear in answers', () => {
+    const board = deserializeBoard({
+      version: BOARD_VERSION,
+      pieces: [
+        {
+          id: 'p',
+          cards: [
+            { id: 'big', place: 10000, digit: 1 },
+            { id: 'c1', place: 1, digit: 3 },
+          ],
+          x: 0,
+          y: 0,
+          mode: 'stack',
+          z: 1,
+        },
+      ],
+    });
+    expect(board[0].cards).toEqual([{ id: 'c1', place: 1, digit: 3 }]);
+  });
+});
+
 describe('sums', () => {
   const ids = new Set(['a', 'b', 'c']);
 

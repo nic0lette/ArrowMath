@@ -75,11 +75,11 @@ describe('placeRows', () => {
 
 describe('rowResult', () => {
   it('gives one card when there is no carry', () => {
-    expect(rowResult(10, 3, 4)).toEqual({ cards: [{ place: 10, digit: 7 }], overflow: null });
+    expect(rowResult(10, 3, 4)).toEqual({ cards: [{ place: 10, digit: 7 }] });
   });
 
   it('gives a zero card for 0 + 0', () => {
-    expect(rowResult(10, 0, 0)).toEqual({ cards: [{ place: 10, digit: 0 }], overflow: null });
+    expect(rowResult(10, 0, 0)).toEqual({ cards: [{ place: 10, digit: 0 }] });
   });
 
   it('stacks the carried ten with the remaining ones', () => {
@@ -88,7 +88,6 @@ describe('rowResult', () => {
         { place: 10, digit: 1 },
         { place: 1, digit: 2 },
       ],
-      overflow: null,
     });
   });
 
@@ -96,8 +95,14 @@ describe('rowResult', () => {
     expect(rowResult(10, 3, 7).cards).toEqual([{ place: 100, digit: 1 }]);
   });
 
-  it('reports thousands that carry past the largest card as an overflow value', () => {
-    expect(rowResult(1000, 5, 6)).toEqual({ cards: [], overflow: 11000 });
+  it('carries ten thousand out of the thousands as a ten-thousands card', () => {
+    expect(rowResult(1000, 5, 6)).toEqual({
+      cards: [
+        { place: 10000, digit: 1 },
+        { place: 1000, digit: 1 },
+      ],
+    });
+    expect(rowResult(1000, 4, 6)).toEqual({ cards: [{ place: 10000, digit: 1 }] });
   });
 });
 
@@ -225,13 +230,45 @@ describe('sumLayout alignment', () => {
     }
   });
 
-  it('ends an overflowing answer at the same tip', () => {
-    const layout = filled(5000, 6000);
+  it('shows a total of ten thousand or more with a ten-thousands card', () => {
+    const layout = filled(5000, 6012);
+    const total = layout.total!;
+    expect(total.cards.map((entry) => [entry.place, entry.digit])).toEqual([
+      [10000, 1],
+      [1000, 1],
+      [10, 1],
+      [1, 2],
+    ]);
+    expect(total.width).toBe(getArrowCardWidth(10000));
     const thousands = layout.rows.find((row) => row.place === 1000)!;
-    expect(thousands.overflow).toBe(11000);
-    expect(layout.total!.overflow).toBe(11000);
-    expect(layout.total!.cards).toEqual([]);
-    expect(tip(thousands.result)).toBe(tip(layout.total!));
+    expect(thousands.resultCards.map((entry) => entry.place)).toEqual([10000, 1000]);
+    expect(tip(thousands.result)).toBe(tip(total));
+    for (const entry of thousands.resultCards) expect(tip(entry)).toBe(tip(total));
+  });
+
+  it('needs the ten-thousands card in the total even when no column does', () => {
+    const layout = filled(9999, 1);
+    expect(layout.total!.cards.map((entry) => [entry.place, entry.digit])).toEqual([[10000, 1]]);
+    for (const row of layout.rows) {
+      expect(row.resultCards.some((entry) => entry.place === 10000)).toBe(false);
+    }
+  });
+
+  it('handles the biggest possible sum', () => {
+    const layout = filled(9999, 9999);
+    expect(layout.total!.value).toBe(19998);
+    expect(layout.total!.cards.map((entry) => [entry.place, entry.digit])).toEqual([
+      [10000, 1],
+      [1000, 9],
+      [100, 9],
+      [10, 9],
+      [1, 8],
+    ]);
+  });
+
+  it('only makes room for a ten-thousands card when the total needs one', () => {
+    expect(filled(4000, 5999).total!.width).toBe(getArrowCardWidth(1000));
+    expect(filled(4000, 6000).total!.width).toBe(getArrowCardWidth(10000));
   });
 
   it('shows a zero card for a total of nothing', () => {

@@ -88,7 +88,7 @@ const card = renderArrowCardSvg({ place: 1000, digit: 3 });
 
 | Option | Type | Default | Meaning |
 |---|---|---|---|
-| `place` | `1000 \| 100 \| 10 \| 1` | required | How many digit slots the card has. |
+| `place` | `10000 \| 1000 \| 100 \| 10 \| 1` | required | How many digit slots the card has. |
 | `digit` | `number` | required | Leading digit (1–9 for normal cards). Trailing slots become `0`. |
 | `theme` | `'curriculum' \| 'montessori' \| 'pastel' \| 'vibrant'` | `'curriculum'` | Colour palette. |
 | `tier` | `'thousands' \| 'hundreds' \| 'tens' \| 'ones'` | derived from `place` | Force a palette tier. |

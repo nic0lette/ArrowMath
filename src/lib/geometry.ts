@@ -18,7 +18,11 @@ export const RESULT_GAP = 18;
 /** Room reserved for the "= 4,325" chip when an expanded group sits near the edge. */
 export const RESULT_RESERVE = 108;
 
-export type Place = PlaceValue;
+/**
+ * The places a real card can have. The card library can also draw a 10,000s
+ * card, but that only ever appears in an addition's answer (see AnswerPlace).
+ */
+export type Place = Exclude<PlaceValue, 10000>;
 export type PieceMode = 'stack' | 'expand';
 export type SpringKind = 'default' | 'bounce';
 export type DropKind = 'stack' | 'chain' | 'conflict';

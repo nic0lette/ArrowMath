@@ -255,6 +255,47 @@ test.describe('addition', () => {
     await expect(workbench(page)).toHaveAttribute('data-card-count', '11');
   });
 
+  test('answers of ten thousand or more use a ten-thousands card that cannot be copied', async ({
+    page,
+  }) => {
+    await gotoSeeded(page, [stack('a', 5003, 300, 560), stack('b', 6004, 900, 560)]);
+    await addPlus(page);
+    await dropIntoSlot(page, 'a', 'left');
+    await dropIntoSlot(page, 'b', 'right');
+
+    const thousands = page.locator('.sum-row[data-row-place="1000"]');
+    await thousands.getByRole('button', { name: 'Show 5,000 + 6,000' }).click();
+    const rowAnswer = thousands.locator('[data-result]');
+    expect(
+      await rowAnswer.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-place'))),
+    ).toEqual(['10000', '1000']);
+    await expect(thousands.locator('.row-overflow')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Show 5,003 + 6,004' }).click();
+    const total = page.locator('[data-total-card]');
+    expect(
+      await total.evaluateAll((nodes) =>
+        nodes.map((node) => [node.getAttribute('data-place'), node.getAttribute('data-digit')]),
+      ),
+    ).toEqual([
+      ['10000', '1'],
+      ['1000', '1'],
+      ['1', '7'],
+    ]);
+
+    // Neither answer can be dragged out, as no real card is that big.
+    await dragOut(page, rowAnswer.first(), 0, -200);
+    await dragOut(page, total.first(), -40, -380);
+    await page.waitForTimeout(300);
+    await expect(workbench(page)).toHaveAttribute('data-piece-count', '2');
+
+    // The ones answer has no ten-thousands card, so it still copies.
+    const ones = page.locator('.sum-row[data-row-place="1"]');
+    await ones.getByRole('button', { name: 'Show 3 + 4' }).click();
+    await dragOut(page, ones.locator('[data-result]').last(), 0, -100);
+    await expect(workbench(page)).toHaveAttribute('data-piece-count', '3');
+  });
+
   test('tapping an answer does not add a copy', async ({ page }) => {
     await gotoSeeded(page, [stack('a', 4, 400, 520), stack('b', 8, 900, 520)]);
     await addPlus(page);

@@ -8,6 +8,7 @@ import {
   attachedSide,
   findSlotPiece,
   findSumSlot,
+  isCopyable,
   isTotalRevealed,
   totalKey,
   placeRows,
@@ -636,7 +637,8 @@ class ArrowMathStore {
    * whole total) onto the bench. It drops exactly like a tray card would.
    */
   beginAnswerDrag(event: PointerEvent, cards: BankCardSource[]): void {
-    if (cards.length === 0) return;
+    // An answer holding a 10,000s card has no real cards to copy into.
+    if (!isCopyable(cards)) return;
     event.stopPropagation();
     this.beginCopyDrag(event, cards, 'answer');
   }

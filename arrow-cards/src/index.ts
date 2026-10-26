@@ -2,8 +2,12 @@
 // No runtime dependencies. Generates plain SVG strings.
 
 export type ColorTheme = 'curriculum' | 'montessori' | 'pastel' | 'vibrant';
-export type PlaceValue = 1000 | 100 | 10 | 1;
-export type PlaceTier = 'thousands' | 'hundreds' | 'tens' | 'ones';
+/**
+ * 10000 is only ever drawn as part of an answer (Arrow Math's sums reach
+ * 19,998); apps decide which places a pupil can actually hold.
+ */
+export type PlaceValue = 10000 | 1000 | 100 | 10 | 1;
+export type PlaceTier = 'tenThousands' | 'thousands' | 'hundreds' | 'tens' | 'ones';
 
 export interface ThemeColorSet {
   bg: string;
@@ -15,6 +19,7 @@ export interface ThemeColorSet {
 
 export interface ThemeColors {
   name: string;
+  tenThousands: ThemeColorSet;
   thousands: ThemeColorSet;
   hundreds: ThemeColorSet;
   tens: ThemeColorSet;
@@ -24,6 +29,13 @@ export interface ThemeColors {
 export const THEMES: Record<ColorTheme, ThemeColors> = {
   curriculum: {
     name: 'UK Primary Standard',
+    tenThousands: {
+      bg: '#f3e8ff',
+      border: '#9333ea',
+      text: '#6b21a8',
+      fill: '#e9d5ff',
+      accent: '#a855f7',
+    },
     thousands: {
       bg: '#fee2e2',
       border: '#ef4444',
@@ -55,6 +67,14 @@ export const THEMES: Record<ColorTheme, ThemeColors> = {
   },
   montessori: {
     name: 'Montessori Classic',
+    // Montessori colours repeat every three places: 10,000s are blue like tens.
+    tenThousands: {
+      bg: '#dbeafe',
+      border: '#1d4ed8',
+      text: '#1e3a8a',
+      fill: '#bfdbfe',
+      accent: '#2563eb',
+    },
     thousands: {
       bg: '#dcfce7',
       border: '#15803d',
@@ -86,6 +106,13 @@ export const THEMES: Record<ColorTheme, ThemeColors> = {
   },
   pastel: {
     name: 'Modern Studio Pastel',
+    tenThousands: {
+      bg: '#dbeafe',
+      border: '#3b82f6',
+      text: '#1e40af',
+      fill: '#bfdbfe',
+      accent: '#60a5fa',
+    },
     thousands: {
       bg: '#ede9fe',
       border: '#7c3aed',
@@ -117,6 +144,13 @@ export const THEMES: Record<ColorTheme, ThemeColors> = {
   },
   vibrant: {
     name: 'High Contrast Bold',
+    tenThousands: {
+      bg: '#701a75',
+      border: '#a21caf',
+      text: '#ffffff',
+      fill: '#86198f',
+      accent: '#d946ef',
+    },
     thousands: {
       bg: '#312e81',
       border: '#4338ca',
@@ -153,6 +187,7 @@ export const ARROW_TIP_WIDTH = 28;
 export const CARD_HEIGHT = 68;
 
 export function getPlaceTier(place: PlaceValue): PlaceTier {
+  if (place === 10000) return 'tenThousands';
   if (place === 1000) return 'thousands';
   if (place === 100) return 'hundreds';
   if (place === 10) return 'tens';
@@ -160,7 +195,7 @@ export function getPlaceTier(place: PlaceValue): PlaceTier {
 }
 
 export function getDigitCount(place: PlaceValue): number {
-  return place === 1000 ? 4 : place === 100 ? 3 : place === 10 ? 2 : 1;
+  return place === 10000 ? 5 : place === 1000 ? 4 : place === 100 ? 3 : place === 10 ? 2 : 1;
 }
 
 export function getArrowCardWidth(place: PlaceValue): number {
@@ -168,11 +203,11 @@ export function getArrowCardWidth(place: PlaceValue): number {
 }
 
 export function getPlaceLabel(place: PlaceValue): string {
-  return place === 1000 ? '1000s' : place === 100 ? '100s' : place === 10 ? '10s' : '1s';
+  return String(place) + 's';
 }
 
 export interface ArrowCardOptions {
-  /** 1000, 100, 10 or 1. Controls the number of digit slots. */
+  /** 10000, 1000, 100, 10 or 1. Controls the number of digit slots. */
   place: PlaceValue;
   /** Leading digit, 0–9. Trailing slots are rendered as zeros. */
   digit: number;
@@ -327,9 +362,8 @@ export function renderArrowCardSvg(options: RenderArrowCardOptions): string {
   const idPrefix = safeIdPart(options.idPrefix ?? 'arrow-card') || 'arrow-card';
   const shadowId = `${idPrefix}-shadow-${place}-${digit}`;
   const gradientId = `${idPrefix}-grad-${tier}-${theme}`;
-  const numberValue = digit * place;
   const ariaLabel =
-    options.ariaLabel ?? `${digit} ${place === 1000 ? 'thousands' : place === 100 ? 'hundreds' : place === 10 ? 'tens' : 'ones'} card, ${numberValue}`;
+    options.ariaLabel ?? getArrowCardAriaLabel(place, digit);
 
   const svgClass = [
     'arrow-card-svg',
@@ -426,6 +460,14 @@ export function renderArrowCardSvg(options: RenderArrowCardOptions): string {
 /** Default accessible label used by the React/Svelte wrappers. */
 export function getArrowCardAriaLabel(place: PlaceValue, digit: number): string {
   const placeName =
-    place === 1000 ? 'thousands' : place === 100 ? 'hundreds' : place === 10 ? 'tens' : 'ones';
+    place === 10000
+      ? 'ten thousands'
+      : place === 1000
+        ? 'thousands'
+        : place === 100
+          ? 'hundreds'
+          : place === 10
+            ? 'tens'
+            : 'ones';
   return `${digit} ${placeName} card, ${digit * place}`;
 }
