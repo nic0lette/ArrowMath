@@ -267,6 +267,37 @@ describe('total reveal', () => {
   });
 });
 
+describe('collapsed sums', () => {
+  const left = piece('a', cardsFor(127));
+  const right = piece('b', cardsFor(2385));
+
+  it('hide the place rows but keep the = and the total', () => {
+    const layout = sumLayout(sum({ left: 'a', right: 'b', collapsed: true }), left, right);
+    expect(layout.rows).toEqual([]);
+    expect(layout.equals).not.toBeNull();
+    expect(layout.total!.value).toBe(2512);
+    // Only the toggle stays above the numbers.
+    expect(layout.bounds.y).toBe(layout.toggle!.y);
+  });
+
+  it('keep the numbers and total where they were', () => {
+    const open = sumLayout(sum({ left: 'a', right: 'b' }), left, right);
+    const closed = sumLayout(sum({ left: 'a', right: 'b', collapsed: true }), left, right);
+    expect(closed.rightPosition).toEqual(open.rightPosition);
+    expect(closed.total!.x).toBe(open.total!.x);
+  });
+
+  it('have a toggle between the plus and the ones row once both sides are filled', () => {
+    const layout = sumLayout(sum({ left: 'a', right: 'b' }), left, right);
+    const toggle = layout.toggle!;
+    const ones = layout.rows[0];
+    expect(toggle.x + toggle.width / 2).toBe(layout.plus.x + layout.plus.width / 2);
+    expect(toggle.y + toggle.height).toBeLessThan(layout.plus.y);
+    expect(toggle.y).toBeGreaterThan(ones.plus.y + ones.plus.height);
+    expect(sumLayout(sum({ left: 'a' }), left, null).toggle).toBeNull();
+  });
+});
+
 describe('findSumSlot', () => {
 
   it('finds the empty left slot when a card is dropped just before the plus', () => {

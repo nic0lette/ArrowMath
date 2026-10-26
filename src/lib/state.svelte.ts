@@ -1327,6 +1327,17 @@ class ArrowMathStore {
     });
   }
 
+  /** Hides or shows a sum's place rows. */
+  toggleCollapsed(sumId: string): void {
+    const sum = this.sums.find((entry) => entry.id === sumId);
+    if (!sum) return;
+    sum.collapsed = !sum.collapsed;
+    if (sum.collapsed) audio.stack();
+    else audio.expand();
+    // Shown rows take room above the numbers, which may need to move down.
+    this.settleSum(sum);
+  }
+
   /** Shows or hides the whole total beside the numbers. */
   toggleTotal(sumId: string): void {
     const sum = this.sums.find((entry) => entry.id === sumId);

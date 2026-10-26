@@ -190,6 +190,14 @@ describe('sums', () => {
     expect(bad.totalRevealed).toBeUndefined();
   });
 
+  it('round-trips a collapsed sum', () => {
+    const stored = serializeBoard(
+      [piece('a', [card(1, 4)], 0, 0), piece('b', [card(1, 8)], 0, 0)],
+      [{ id: 's', x: 0, y: 0, left: 'a', right: 'b', revealed: {}, collapsed: true }],
+    );
+    expect(deserializeSums(JSON.parse(JSON.stringify(stored)), ids)[0].collapsed).toBe(true);
+  });
+
   it('treats a board saved before sums existed as having none', () => {
     expect(deserializeSums({ version: BOARD_VERSION, pieces: [] }, ids)).toEqual([]);
     expect(deserializeSums({ sums: [{ id: '' }, null, 'x'] }, ids)).toEqual([]);

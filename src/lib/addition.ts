@@ -43,6 +43,9 @@ export const TOTAL_EQUALS_SIZE = 40;
 export const TOTAL_GAP = 14;
 /** Room for a total of 10,000 or more, shown as text at full size. */
 export const TOTAL_OVERFLOW_WIDTH = 132;
+/** The button above the plus that hides or shows the place rows. */
+export const TOGGLE_SIZE = 24;
+export const TOGGLE_GAP = 6;
 
 export type SumSide = 'left' | 'right';
 
@@ -61,6 +64,8 @@ export interface Sum {
   revealed: Partial<Record<Place, string>>;
   /** Set when the total's "=" has been pressed, keyed like `revealed`. */
   totalRevealed?: string;
+  /** Hides the place rows, leaving just the numbers and their total. */
+  collapsed?: boolean;
 }
 
 export interface PlaceRow {
@@ -112,6 +117,8 @@ export interface SumLayout {
   equals: Bounds | null;
   /** Where the total goes. Its space is kept even while it is hidden. */
   total: TotalGeometry | null;
+  /** Hides or shows the place rows, once both sides are filled. */
+  toggle: Bounds | null;
   bounds: Bounds;
 }
 
@@ -202,6 +209,7 @@ export function sumLayout(sum: Sum, left: Piece | null, right: Piece | null): Su
       rows: [],
       equals: null,
       total: null,
+      toggle: null,
       bounds: { x: minX, y: sum.y, width: maxX - minX, height: CARD_HEIGHT },
     };
   }
@@ -249,7 +257,16 @@ export function sumLayout(sum: Sum, left: Piece | null, right: Piece | null): Su
     }),
   };
 
-  const rows = layoutRows(sum, placed, {
+  const toggle: Bounds = {
+    x: plusCenter - TOGGLE_SIZE / 2,
+    y: plus.y - TOGGLE_GAP - TOGGLE_SIZE,
+    width: TOGGLE_SIZE,
+    height: TOGGLE_SIZE,
+  };
+
+  // Collapsing only hides the rows; everything on the numbers' line stays
+  // where it was, so the columns are still laid out to place it.
+  const rows = sum.collapsed ? [] : layoutRows(sum, placed, {
     rowPlusX,
     leftTip: sum.x - PLUS_GAP,
     rightTip,
@@ -258,7 +275,7 @@ export function sumLayout(sum: Sum, left: Piece | null, right: Piece | null): Su
   });
 
   let minX = leftPosition!.x;
-  let minY = sum.y;
+  let minY = toggle.y;
   for (const row of rows) {
     minX = Math.min(minX, row.leftCard.x);
     minY = Math.min(minY, row.y);
@@ -273,6 +290,7 @@ export function sumLayout(sum: Sum, left: Piece | null, right: Piece | null): Su
     rows,
     equals,
     total,
+    toggle,
     bounds: { x: minX, y: minY, width: totalTip - minX, height: sum.y + CARD_HEIGHT - minY },
   };
 }

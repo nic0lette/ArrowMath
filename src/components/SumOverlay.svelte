@@ -73,9 +73,37 @@
     style:height="{layout.plus.height}px"
     onpointerdown={beginDrag}
     onkeydown={onPlusKey}
+    ondblclick={(event) => {
+      event.stopPropagation();
+      if (layout.toggle) game.toggleCollapsed(sum.id);
+    }}
   >
     +
   </div>
+
+  {#if layout.toggle}
+    <button
+      class="sum-toggle"
+      class:collapsed={sum.collapsed}
+      type="button"
+      aria-expanded={!sum.collapsed}
+      aria-label="{sum.collapsed ? 'Show' : 'Hide'} the place rows"
+      title="{sum.collapsed ? 'Show' : 'Hide'} the place rows (or double-click the plus)"
+      style:left="{layout.toggle.x}px"
+      style:top="{layout.toggle.y}px"
+      style:width="{layout.toggle.width}px"
+      style:height="{layout.toggle.height}px"
+      onpointerdown={(event) => event.stopPropagation()}
+      onclick={(event) => {
+        event.stopPropagation();
+        game.toggleCollapsed(sum.id);
+      }}
+    >
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+        <path d="M4 10l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
+  {/if}
 
   {#if selected}
     <button
@@ -308,6 +336,42 @@
     box-shadow:
       var(--shadow-sm),
       0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+
+  .sum-toggle {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--panel);
+    color: var(--muted-strong);
+    box-shadow: var(--shadow-xs);
+    cursor: pointer;
+    pointer-events: auto;
+    transition:
+      color 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .sum-toggle svg {
+    transition: transform 160ms ease;
+  }
+
+  /* Points up to fold the rows away, down to bring them back. */
+  .sum-toggle.collapsed svg {
+    transform: rotate(180deg);
+  }
+
+  .sum-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .sum-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
 
   .sum-remove {

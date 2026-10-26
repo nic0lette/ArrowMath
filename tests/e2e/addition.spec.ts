@@ -177,6 +177,28 @@ test.describe('addition', () => {
     await expect(total).toHaveCount(0);
   });
 
+  test('the place rows collapse and expand, keeping their answers', async ({ page }) => {
+    await gotoSeeded(page, [stack('a', 12, 40, 40), stack('b', 34, 900, 40)]);
+    await addPlus(page);
+    await dropIntoSlot(page, 'a', 'left');
+    await dropIntoSlot(page, 'b', 'right');
+    await page.locator('.sum-row[data-row-place="1"]').getByRole('button', { name: 'Show 2 + 4' }).click();
+
+    await page.getByRole('button', { name: 'Hide the place rows' }).click();
+    await expect(page.locator('.sum-row')).toHaveCount(0);
+    await expect(page.locator('.total-equals')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Show the place rows' }).click();
+    await expect(page.locator('.sum-row')).toHaveCount(2);
+    await expect(page.locator('.sum-row[data-row-place="1"] [data-result]')).toHaveCount(1);
+
+    // Double-clicking the plus toggles the same way.
+    await plus(page).dblclick();
+    await expect(page.locator('.sum-row')).toHaveCount(0);
+    await plus(page).dblclick();
+    await expect(page.locator('.sum-row')).toHaveCount(2);
+  });
+
   test('a place one number leaves out shows as a zero card', async ({ page }) => {
     await gotoSeeded(page, [stack('a', 123, 40, 40), stack('b', 205, 900, 40)]);
     await addPlus(page);
