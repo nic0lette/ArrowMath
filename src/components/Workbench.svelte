@@ -6,6 +6,7 @@
   import SumOverlay from './SumOverlay.svelte';
   import HoverHalo from './HoverHalo.svelte';
   import EmptyState from './EmptyState.svelte';
+  import BoardTabs from './BoardTabs.svelte';
 
   interface FlatCard {
     card: Card;
@@ -133,6 +134,14 @@
     return { destroy: () => node.removeEventListener('wheel', onWheel) };
   }
 
+  let scroller: HTMLElement | undefined = $state();
+
+  // Each board opens at its left edge, wherever the last one was scrolled to.
+  $effect(() => {
+    game.activeBoardId;
+    if (scroller) scroller.scrollLeft = 0;
+  });
+
   function onCanvasPointerLeave() {
     if (!game.isInteracting) game.clearIntent();
   }
@@ -152,13 +161,14 @@
     data-piece-count={game.pieces.length}
     data-sum-count={game.sums.length}
   >
-    <div class="canvas-head" aria-hidden="true">
-      <div class="canvas-status">
+    <div class="canvas-head">
+      <div class="canvas-status" aria-hidden="true">
         <span class="status-spark"></span>
         <span class="status-label">Workbench</span>
         <span class="status-divider"></span>
         <span class="status-count">{countLabel}</span>
       </div>
+      <BoardTabs />
     </div>
 
     {#if game.pieces.length === 0 && game.sums.length === 0}
@@ -169,13 +179,18 @@
       class="workbench-scroll"
       role="presentation"
       data-workbench-scroll
+      bind:this={scroller}
       use:wheelScrollsSideways
       onpointerdown={onScrollerPointerDown}
       onpointermove={onScrollerPointerMove}
       onpointerup={endPan}
       onpointercancel={endPan}
     >
-    <div class="workbench-content" style:width="{game.scrollWidth}px">
+    <div class="workbench-content" data-workbench-content style:width="{game.scrollWidth}px">
+    {#key game.activeBoardId}
+    <!-- Remounts per board, so the new board's cards slide in rather than
+         springing across from where the old board's cards were. -->
+    <div class="board-layer" data-slide={game.boardSlide}>
     <div class="cards-layer">
       {#each game.sums as sum (sum.id)}
         <SumOverlay {sum} />
@@ -205,6 +220,8 @@
     {#if game.hover}
       <HoverHalo />
     {/if}
+    </div>
+    {/key}
     </div>
     </div>
 
@@ -261,6 +278,35 @@
       linear-gradient(to right, var(--canvas-grid) 1px, transparent 1px),
       linear-gradient(to bottom, var(--canvas-grid) 1px, transparent 1px);
     background-size: 24px 24px;
+  }
+
+  /* No z-index here either: cards and their toolbars keep sharing the
+     workbench's stacking context once the slide has finished. */
+  .board-layer {
+    position: absolute;
+    inset: 0;
+  }
+
+  .board-layer[data-slide='next'] {
+    animation: board-in-next 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .board-layer[data-slide='previous'] {
+    animation: board-in-previous 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @keyframes board-in-next {
+    from {
+      opacity: 0;
+      transform: translateX(48px);
+    }
+  }
+
+  @keyframes board-in-previous {
+    from {
+      opacity: 0;
+      transform: translateX(-48px);
+    }
   }
 
   .cards-layer {
@@ -353,6 +399,21 @@
   @media (max-width: 720px) {
     .workbench {
       border-radius: 18px;
+    }
+
+    /* The boards need the room more than the card count does. */
+    .canvas-status {
+      display: none;
+    }
+
+    .canvas-head {
+      justify-content: flex-end;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .board-layer[data-slide] {
+      animation: none;
     }
   }
 </style>

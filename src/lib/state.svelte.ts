@@ -259,6 +259,8 @@ class ArrowMathStore {
   /** Every board in the lesson, in order. */
   boards = $state<LessonBoard[]>([]);
   activeBoardId = $state('');
+  /** Which way the last board change went, so the new board slides in from that side. */
+  boardSlide = $state<'next' | 'previous' | null>(null);
   selectedSumId = $state<string | null>(null);
   /** The plus side a dragged number would attach to if dropped now. */
   sumHover = $state<SumHover | null>(null);
@@ -495,7 +497,12 @@ class ArrowMathStore {
    */
   private applyLesson(next: Lesson): void {
     const changing = next.activeBoardId !== this.activeBoardId;
-    if (changing) this.leaveBoard();
+    if (changing) {
+      this.leaveBoard();
+      const from = next.boards.findIndex((board) => board.id === this.activeBoardId);
+      const to = next.boards.findIndex((board) => board.id === next.activeBoardId);
+      this.boardSlide = from !== -1 && to < from ? 'previous' : 'next';
+    }
     this.boards = next.boards;
     this.activeBoardId = next.activeBoardId;
     if (!changing) return;
@@ -514,8 +521,8 @@ class ArrowMathStore {
     this.dismissToast();
   }
 
-  get activeBoard(): LessonBoard | undefined {
-    return this.boards.find((board) => board.id === this.activeBoardId);
+  get activeBoardIndex(): number {
+    return this.boards.findIndex((board) => board.id === this.activeBoardId);
   }
 
   switchBoard(id: string): void {
@@ -584,8 +591,10 @@ class ArrowMathStore {
     // workbench's border box instead would add its 1px border to every synced
     // position, which makes a single card creep by 1px on each click.
     // The layer scrolls sideways inside the scroller, so its left edge can be
-    // far off screen; it still maps the pointer into bench coordinates.
-    const layer = this.canvasEl.querySelector<HTMLElement>('.cards-layer');
+    // far off screen; it still maps the pointer into bench coordinates. The
+    // content box is measured rather than the cards layer inside it: the two
+    // match exactly, but the cards layer slides when the board changes.
+    const layer = this.canvasEl.querySelector<HTMLElement>('[data-workbench-content]');
     const scroller = this.canvasEl.querySelector<HTMLElement>('[data-workbench-scroll]');
     const rect = (layer ?? this.canvasEl).getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
