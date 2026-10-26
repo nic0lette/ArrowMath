@@ -128,13 +128,19 @@
       <button
         class="tool-button danger"
         type="button"
-        aria-label="Reset canvas"
-        title="Clear the workbench"
+        aria-label={game.activeStart ? 'Reset to start' : 'Reset canvas'}
+        title={game.activeStart ? 'Bring back the saved start' : 'Clear the workbench'}
         onclick={() => game.resetCanvas()}
       >
-        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-          <path d="M3.5 4.5h9M6.5 4.5V3.2c0-.39.31-.7.7-.7h1.6c.39 0 .7.31.7.7v1.3M5 4.5l.6 8.1c.03.5.45.9.96.9h2.88c.51 0 .93-.4.96-.9l.6-8.1" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        {#if game.activeStart}
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <path d="M3.2 8a4.8 4.8 0 1 0 1.4-3.4M3.2 2.6v2.6h2.6" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {:else}
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <path d="M3.5 4.5h9M6.5 4.5V3.2c0-.39.31-.7.7-.7h1.6c.39 0 .7.31.7.7v1.3M5 4.5l.6 8.1c.03.5.45.9.96.9h2.88c.51 0 .93-.4.96-.9l.6-8.1" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {/if}
         <span class="tool-label">Reset</span>
       </button>
     </div>

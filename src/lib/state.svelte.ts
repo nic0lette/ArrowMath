@@ -24,6 +24,7 @@ import {
   loadLesson,
   saveLessonLater,
   serializeLesson,
+  type BoardState,
   type Lesson,
   type LessonBoard,
 } from './boardStorage';
@@ -35,6 +36,8 @@ import {
   neighbourBoardId,
   removeBoard,
   renameBoard,
+  sameBoard,
+  setStart,
 } from './lesson';
 import { freezeCardMotion } from './cardMotion';
 import {
@@ -523,6 +526,43 @@ class ArrowMathStore {
 
   get activeBoardIndex(): number {
     return this.boards.findIndex((board) => board.id === this.activeBoardId);
+  }
+
+  /** The active board's saved start, if the teacher saved one. */
+  get activeStart(): BoardState | null {
+    return this.boards.find((board) => board.id === this.activeBoardId)?.start ?? null;
+  }
+
+  /** Whether a board has a saved start and has moved on from it. */
+  isChangedSinceStart(id: string): boolean {
+    const board = this.boards.find((entry) => entry.id === id);
+    if (!board?.start) return false;
+    const now = id === this.activeBoardId ? { pieces: this.pieces, sums: this.sums } : board;
+    return !sameBoard(now, board.start);
+  }
+
+  /** Makes the active board as it is now the layout Reset comes back to. */
+  saveStart(): void {
+    const previous = this.activeStart;
+    const id = this.activeBoardId;
+    this.applyLesson(setStart(this.currentLesson(), id, { pieces: this.pieces, sums: this.sums }));
+    audio.tidy();
+    this.notify(previous ? 'Replaced the saved start.' : 'Saved as the start. Reset brings it back.', 'success', {
+      label: 'Undo',
+      run: () => this.applyLesson(setStart(this.currentLesson(), id, previous)),
+    });
+  }
+
+  forgetStart(): void {
+    const previous = this.activeStart;
+    if (!previous) return;
+    const id = this.activeBoardId;
+    this.applyLesson(setStart(this.currentLesson(), id, null));
+    audio.click();
+    this.notify('Forgot the saved start. Reset clears the board.', 'info', {
+      label: 'Undo',
+      run: () => this.applyLesson(setStart(this.currentLesson(), id, previous)),
+    });
   }
 
   switchBoard(id: string): void {
@@ -1886,26 +1926,53 @@ class ArrowMathStore {
     this.notify('All cards tidied into rows.', 'success');
   }
 
+  /** Brings back the saved start, or clears a board that has none. */
   resetCanvas(): void {
+    const start = this.activeStart;
+    if (!start) {
+      this.clearBoard();
+      return;
+    }
+    if (sameBoard({ pieces: this.pieces, sums: this.sums }, start)) {
+      this.notify('This board is already at its saved start.', 'info');
+      audio.click();
+      return;
+    }
+    this.replaceBoard(clonePieces(start.pieces), cloneSums(start.sums));
+    audio.tidy();
+    this.notify('Back to the saved start.', 'info', this.undoReplaceAction());
+  }
+
+  clearBoard(): void {
     if (this.pieces.length === 0 && this.sums.length === 0) {
       this.notify('The workbench is already clear.', 'info');
       audio.click();
       return;
     }
+    this.replaceBoard([], []);
+    audio.reset();
+    this.notify('Workbench cleared.', 'info', this.undoReplaceAction());
+  }
+
+  /** Swaps every piece and plus on the board, keeping the old ones for Undo. */
+  private replaceBoard(pieces: Piece[], sums: Sum[]): void {
     this.resetSnapshot = { pieces: clonePieces(this.pieces), sums: cloneSums(this.sums) };
     // The pieces are leaving the board, so their bounce timers should not
     // outlive them and reveal a late "settle" on a piece that no longer exists.
     for (const piece of this.pieces) this.markRemoved(piece.id);
-    this.pieces = [];
-    this.sums = [];
+    this.pieces = pieces;
+    this.sums = sums;
     this.selectedId = null;
     this.selectedSumId = null;
     this.hoveredId = null;
     this.hover = null;
     this.intent = null;
     this.lastPointerDown = null;
-    audio.reset();
-    this.notify('Workbench cleared.', 'info', {
+    this.keepPiecesInView();
+  }
+
+  private undoReplaceAction(): { label: string; run: () => void } {
+    return {
       label: 'Undo',
       run: () => {
         if (!this.resetSnapshot) return;
@@ -1914,7 +1981,7 @@ class ArrowMathStore {
         this.resetSnapshot = null;
         audio.tidy();
       },
-    });
+    };
   }
 
   makeNumber(raw: string, mode: PieceMode): void {

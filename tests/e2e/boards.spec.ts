@@ -265,3 +265,95 @@ test('a new board slides in from the side it comes from', async ({ page }) => {
   await page.keyboard.press('PageUp');
   await expect(layer).toHaveAttribute('data-slide', 'previous');
 });
+
+async function chooseFromBoardMenu(page: Page, item: string): Promise<void> {
+  await openBoardMenu(page);
+  await page.getByRole('menuitem', { name: item }).click();
+}
+
+test('Reset brings back the start the teacher saved, and can be undone', async ({ page }) => {
+  await gotoLesson(page, lesson, undefined, 'carrying');
+  const home = await boxOf(card(page, 10, 7));
+  await chooseFromBoardMenu(page, 'Save as start');
+  await expect(page.locator('.toast-message')).toContainText('Saved as the start');
+  await expect(boardButton(page, 'Carrying')).not.toHaveAttribute('data-changed', 'true');
+
+  // The class works on the problem.
+  await dragCardBy(page, card(page, 10, 7), 0, 144);
+  await selectPieceOf(page, card(page, 1, 8));
+  await page.keyboard.press('Delete');
+  await expectBoard(page, 'carrying', 1);
+  await expect(boardButton(page, 'Carrying')).toHaveAttribute('data-changed', 'true');
+
+  await page.getByRole('button', { name: 'Reset to start' }).click();
+  await expect(page.locator('.toast-message')).toContainText('Back to the saved start');
+  await expectBoard(page, 'carrying', 2);
+  await expect(boardButton(page, 'Carrying')).not.toHaveAttribute('data-changed', 'true');
+  await expect
+    .poll(async () => Math.abs((await boxOf(card(page, 10, 7))).y - home.y))
+    .toBeLessThanOrEqual(2);
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expectBoard(page, 'carrying', 1);
+  await expect(boardButton(page, 'Carrying')).toHaveAttribute('data-changed', 'true');
+});
+
+test('Reset on a board that is already at its start says so', async ({ page }) => {
+  await gotoLesson(page, lesson);
+  await chooseFromBoardMenu(page, 'Save as start');
+  await page.getByRole('button', { name: 'Reset to start' }).click();
+  await expect(page.locator('.toast-message')).toContainText('already at its saved start');
+  await expectBoard(page, 'warm-up', 1);
+});
+
+test('a board changed since its start stays marked after switching away and reloading', async ({ page }) => {
+  await gotoLesson(page, lesson);
+  await chooseFromBoardMenu(page, 'Save as start');
+  await dragCardBy(page, card(page, 100, 3), 96, 48);
+  await page.keyboard.press('PageDown');
+
+  await expect(boardButton(page, 'Warm-up')).toHaveAttribute('data-changed', 'true');
+  // A board without a saved start is never marked.
+  await expect(boardButton(page, 'Carrying')).not.toHaveAttribute('data-changed', 'true');
+
+  await page.waitForTimeout(600);
+  await page.reload();
+  await expect(boardButton(page, 'Warm-up')).toHaveAttribute('data-changed', 'true');
+  await page.keyboard.press('PageUp');
+  await page.getByRole('button', { name: 'Reset to start' }).click();
+  await expect(boardButton(page, 'Warm-up')).not.toHaveAttribute('data-changed', 'true');
+});
+
+test('saving a new start replaces the old one, and Undo puts the old one back', async ({ page }) => {
+  await gotoLesson(page, lesson);
+  await chooseFromBoardMenu(page, 'Save as start');
+  await dragCardBy(page, card(page, 100, 3), 96, 48);
+
+  await chooseFromBoardMenu(page, 'Replace start');
+  await expect(page.locator('.toast-message')).toContainText('Replaced the saved start');
+  await expect(boardButton(page, 'Warm-up')).not.toHaveAttribute('data-changed', 'true');
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(boardButton(page, 'Warm-up')).toHaveAttribute('data-changed', 'true');
+});
+
+test('forgetting the start makes Reset clear the board again', async ({ page }) => {
+  await gotoLesson(page, lesson);
+  await chooseFromBoardMenu(page, 'Save as start');
+  await chooseFromBoardMenu(page, 'Forget start');
+  await expect(page.getByRole('button', { name: 'Reset to start' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Reset canvas' }).click();
+  await expectBoard(page, 'warm-up', 0);
+});
+
+test('Clear board empties the board but keeps its saved start', async ({ page }) => {
+  await gotoLesson(page, lesson);
+  await chooseFromBoardMenu(page, 'Save as start');
+  await chooseFromBoardMenu(page, 'Clear board');
+  await expectBoard(page, 'warm-up', 0);
+  await expect(boardButton(page, 'Warm-up')).toHaveAttribute('data-changed', 'true');
+
+  await page.getByRole('button', { name: 'Reset to start' }).click();
+  await expectBoard(page, 'warm-up', 1);
+});

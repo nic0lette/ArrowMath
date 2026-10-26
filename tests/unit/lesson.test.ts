@@ -6,6 +6,8 @@ import {
   neighbourBoardId,
   removeBoard,
   renameBoard,
+  sameBoard,
+  setStart,
 } from '../../src/lib/lesson';
 import type { Piece } from '../../src/lib/geometry';
 
@@ -129,5 +131,56 @@ describe('neighbourBoardId', () => {
   it('stops at either end instead of wrapping around', () => {
     expect(neighbourBoardId({ ...three, activeBoardId: 'c' }, 1)).toBeNull();
     expect(neighbourBoardId({ ...three, activeBoardId: 'a' }, -1)).toBeNull();
+  });
+});
+
+describe('setStart', () => {
+  it('saves a copy of the layout as the board\'s start, separate from the live board', () => {
+    const live = { pieces: [piece('p')], sums: [] };
+    const after = setStart(lesson('a', board('a'), board('b')), 'a', live);
+
+    expect(after.boards[0].start).toEqual(live);
+    live.pieces[0].x = 999;
+    expect(after.boards[0].start!.pieces[0].x).toBe(10);
+    expect(after.boards[1].start).toBeNull();
+  });
+
+  it('forgets a saved start', () => {
+    const saved = lesson('a', board('a', 'a', { start: { pieces: [], sums: [] } }));
+    expect(setStart(saved, 'a', null).boards[0].start).toBeNull();
+  });
+});
+
+describe('sameBoard', () => {
+  const sum = { id: 's', x: 0, y: 0, left: 'p', right: null, revealed: {} };
+
+  it('matches a copy of the same layout', () => {
+    const state = { pieces: [piece('p'), piece('q')], sums: [sum] };
+    expect(sameBoard(state, { pieces: [piece('p'), piece('q')], sums: [{ ...sum }] })).toBe(true);
+  });
+
+  it('ignores which piece is on top, the order they were added and sub-pixel drift', () => {
+    const p = piece('p');
+    const q = { ...piece('q'), z: 4 };
+    const moved = { ...p, x: p.x + 0.001, z: 9 };
+    expect(sameBoard({ pieces: [p, q], sums: [] }, { pieces: [q, moved], sums: [] })).toBe(true);
+  });
+
+  it('notices a moved, changed, added or removed piece', () => {
+    const start = { pieces: [piece('p')], sums: [] };
+    expect(sameBoard(start, { pieces: [{ ...piece('p'), x: 40 }], sums: [] })).toBe(false);
+    expect(sameBoard(start, { pieces: [{ ...piece('p'), mode: 'expand' }], sums: [] })).toBe(false);
+    const changed = piece('p');
+    changed.cards[0].digit = 4;
+    expect(sameBoard(start, { pieces: [changed], sums: [] })).toBe(false);
+    expect(sameBoard(start, { pieces: [piece('p'), piece('q')], sums: [] })).toBe(false);
+    expect(sameBoard(start, { pieces: [], sums: [] })).toBe(false);
+  });
+
+  it('notices a revealed answer or a moved plus', () => {
+    const start = { pieces: [piece('p')], sums: [sum] };
+    expect(sameBoard(start, { pieces: [piece('p')], sums: [{ ...sum, revealed: { 1: '3' } }] })).toBe(false);
+    expect(sameBoard(start, { pieces: [piece('p')], sums: [{ ...sum, totalRevealed: '3' }] })).toBe(false);
+    expect(sameBoard(start, { pieces: [piece('p')], sums: [{ ...sum, x: 48 }] })).toBe(false);
   });
 });

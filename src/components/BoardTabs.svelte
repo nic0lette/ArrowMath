@@ -81,6 +81,7 @@
   <div class="board-list" bind:this={list}>
     {#each game.boards as board (board.id)}
       {@const active = board.id === game.activeBoardId}
+      {@const changed = game.isChangedSinceStart(board.id)}
       <div class="board-item" class:active>
         {#if editingId === board.id}
           <input
@@ -98,11 +99,13 @@
             class="board-tab"
             type="button"
             aria-current={active ? 'true' : undefined}
-            title={board.name}
+            data-changed={changed ? 'true' : undefined}
+            title={changed ? `${board.name} (changed since its saved start)` : board.name}
             onclick={() => game.switchBoard(board.id)}
             ondblclick={() => startRename(board.id)}
           >
             {board.name}
+            {#if changed}<span class="changed-dot" aria-hidden="true"></span>{/if}
           </button>
           {#if active}
             <button
@@ -140,9 +143,21 @@
 
   {#if menuOpen}
     <div class="board-menu" role="menu" aria-label="Board options">
+      <button type="button" role="menuitem" onclick={() => runFromMenu(() => game.saveStart())}>
+        {game.activeStart ? 'Replace start' : 'Save as start'}
+      </button>
+      {#if game.activeStart}
+        <button type="button" role="menuitem" onclick={() => runFromMenu(() => game.forgetStart())}>
+          Forget start
+        </button>
+      {/if}
+      <span class="menu-divider" role="separator"></span>
       <button type="button" role="menuitem" onclick={() => startRename(game.activeBoardId)}>Rename</button>
       <button type="button" role="menuitem" onclick={() => runFromMenu(() => game.duplicateBoard())}>
         Duplicate
+      </button>
+      <button type="button" role="menuitem" onclick={() => runFromMenu(() => game.clearBoard())}>
+        Clear board
       </button>
       <button
         class="danger"
@@ -210,6 +225,9 @@
   }
 
   .board-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     max-width: 160px;
     height: 22px;
     padding: 0 9px;
@@ -219,6 +237,15 @@
     font-weight: 650;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .changed-dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--warn);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--warn) 20%, transparent);
   }
 
   .board-item:not(.active) .board-tab:hover {
@@ -304,6 +331,12 @@
 
   .board-menu button:hover:not(:disabled) {
     background: var(--surface-muted);
+  }
+
+  .menu-divider {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--line);
   }
 
   .board-menu .danger {

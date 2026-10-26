@@ -1,10 +1,17 @@
 import type { Sum } from './addition';
-import { MAX_BOARD_NAME, defaultBoardName, type BoardState, type Lesson, type LessonBoard } from './boardStorage';
+import {
+  MAX_BOARD_NAME,
+  defaultBoardName,
+  serializeBoard,
+  type BoardState,
+  type Lesson,
+  type LessonBoard,
+} from './boardStorage';
 import type { Piece } from './geometry';
 
 /**
- * The lesson's boards as pure data: adding, copying, renaming, removing and
- * stepping between them. Each operation returns a new lesson (or the same one
+ * The lesson's boards as pure data: adding, copying, renaming, removing,
+ * stepping between them and saving their starts. Each operation returns a new lesson (or the same one
  * when nothing changes), so the store only has to swap the live board in and
  * out, and everything here stays unit-testable.
  */
@@ -85,4 +92,31 @@ export function removeBoard(lesson: Lesson, id: string): Lesson {
 export function neighbourBoardId(lesson: Lesson, delta: number): string | null {
   const index = lesson.boards.findIndex((board) => board.id === lesson.activeBoardId);
   return lesson.boards[index + delta]?.id ?? null;
+}
+
+/** Saves a copy of `state` as the board's start, or forgets the start with null. */
+export function setStart(lesson: Lesson, id: string, state: BoardState | null): Lesson {
+  const start = state ? cloneBoardState(state) : null;
+  return {
+    ...lesson,
+    boards: lesson.boards.map((board) => (board.id === id ? { ...board, start } : board)),
+  };
+}
+
+/**
+ * Whether two layouts look the same to a class: the same cards in the same
+ * places, the same pluses and the same answers showing. Which piece happens to
+ * be on top, and the order pieces were added in, do not count.
+ */
+export function sameBoard(a: BoardState, b: BoardState): boolean {
+  return boardKey(a) === boardKey(b);
+}
+
+function boardKey(state: BoardState): string {
+  const stored = serializeBoard(state.pieces, state.sums);
+  const byId = (left: { id: string }, right: { id: string }) => left.id.localeCompare(right.id);
+  return JSON.stringify({
+    pieces: stored.pieces.map(({ z: _z, ...piece }) => piece).sort(byId),
+    sums: [...(stored.sums ?? [])].sort(byId),
+  });
 }
