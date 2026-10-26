@@ -88,6 +88,33 @@ test.describe('addition', () => {
     expect(right.x - (plusBox.x + plusBox.width)).toBeLessThan(24);
   });
 
+  test('row cards end at their number\'s arrow tip and every = shares a column', async ({ page }) => {
+    await gotoSeeded(page, [stack('a', 127, 40, 40), stack('b', 5, 900, 40)]);
+    await addPlus(page);
+    await dropIntoSlot(page, 'a', 'left');
+    await dropIntoSlot(page, 'b', 'right');
+    await page.waitForTimeout(500);
+
+    const tip = (box: Box) => box.x + box.width;
+    const left = await pieceBox(page, 'a');
+    const right = await pieceBox(page, 'b');
+    for (const node of await page.locator('.mini-card[data-part="left"]').all()) {
+      expect(tip(await boxOf(node))).toBeCloseTo(tip(left), 0);
+    }
+    for (const node of await page.locator('.mini-card[data-part="right"]').all()) {
+      expect(tip(await boxOf(node))).toBeCloseTo(tip(right), 0);
+    }
+
+    const centers = await page
+      .locator('.row-equals')
+      .evaluateAll((nodes) => nodes.map((node) => {
+        const box = node.getBoundingClientRect();
+        return box.left + box.width / 2;
+      }));
+    expect(centers).toHaveLength(3);
+    for (const center of centers) expect(center).toBeCloseTo(centers[0], 0);
+  });
+
   test('= shows the column answer, with a carry as a stacked ten', async ({ page }) => {
     await gotoSeeded(page, [stack('a', 4, 40, 40), stack('b', 8, 900, 40)]);
     await addPlus(page);

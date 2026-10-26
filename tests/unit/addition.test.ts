@@ -3,6 +3,8 @@ import { CARD_HEIGHT, getArrowCardWidth } from 'arrow-cards';
 import {
   PLUS_GAP,
   PLUS_SIZE,
+  ROW_ITEM_GAP,
+  ROW_SCALE,
   findSumSlot,
   placeRows,
   rowResult,
@@ -99,7 +101,7 @@ describe('rowResult', () => {
 describe('sumLayout', () => {
   it('puts the left number just before the plus and the right number just after it', () => {
     const left = piece('a', cardsFor(1234));
-    const right = piece('b', cardsFor(56));
+    const right = piece('b', cardsFor(5678));
     const layout = sumLayout(sum({ left: 'a', right: 'b' }), left, right);
 
     expect(layout.plus.x).toBe(400);
@@ -152,6 +154,103 @@ describe('sumLayout', () => {
     expect(layout.bounds.y).toBeLessThanOrEqual(top);
     expect(layout.bounds.y + layout.bounds.height).toBe(300 + CARD_HEIGHT);
     expect(layout.bounds.x).toBeLessThanOrEqual(layout.leftPosition!.x);
+  });
+});
+
+describe('sumLayout alignment', () => {
+  const tip = (box: { x: number; width: number }) => box.x + box.width;
+
+  function filled(leftValue: number, rightValue: number) {
+    const left = piece('a', cardsFor(leftValue));
+    const right = piece('b', cardsFor(rightValue));
+    return sumLayout(sum({ left: 'a', right: 'b' }), left, right);
+  }
+
+  it('ends every left row card at the left number\'s arrow tip', () => {
+    const layout = filled(1234, 56);
+    for (const row of layout.rows) expect(tip(row.leftCard)).toBe(400 - PLUS_GAP);
+  });
+
+  it('ends every right row card at the right number\'s arrow tip', () => {
+    const layout = filled(1234, 5678);
+    const rightTip = layout.rightPosition!.x + getArrowCardWidth(1000);
+    for (const row of layout.rows) expect(tip(row.rightCard)).toBe(rightTip);
+  });
+
+  it('moves a narrow right number along so the widest row card still clears the plus', () => {
+    const layout = filled(5678, 5);
+    const thousands = layout.rows.find((row) => row.place === 1000)!;
+    expect(thousands.rightCard.x).toBeGreaterThanOrEqual(
+      thousands.plus.x + thousands.plus.width + ROW_ITEM_GAP,
+    );
+    const rightTip = layout.rightPosition!.x + getArrowCardWidth(1);
+    expect(layout.rightPosition!.x).toBeGreaterThan(400 + PLUS_SIZE + PLUS_GAP);
+    for (const row of layout.rows) expect(tip(row.rightCard)).toBe(rightTip);
+  });
+
+  it('puts an = after the right number, in the same column as every row\'s =', () => {
+    const layout = filled(127, 2385);
+    const equals = layout.equals!;
+    const center = equals.x + equals.width / 2;
+    expect(equals.x).toBeGreaterThan(layout.rightPosition!.x + getArrowCardWidth(1000));
+    expect(equals.y + equals.height / 2).toBe(300 + CARD_HEIGHT / 2);
+    for (const row of layout.rows) expect(row.equals.x + row.equals.width / 2).toBe(center);
+  });
+
+  it('keeps room for the total as full-size cards after the =', () => {
+    const layout = filled(127, 2385);
+    const total = layout.total!;
+    expect(total.value).toBe(2512);
+    expect(total.x).toBeGreaterThan(layout.equals!.x + layout.equals!.width);
+    expect(total.width).toBe(getArrowCardWidth(1000));
+    expect(total.cards.map((entry) => [entry.place, entry.digit])).toEqual([
+      [1000, 2],
+      [100, 5],
+      [10, 1],
+      [1, 2],
+    ]);
+    for (const entry of total.cards) expect(tip(entry)).toBe(tip(total));
+    expect(tip(layout.bounds)).toBeGreaterThanOrEqual(tip(total));
+  });
+
+  it('ends every row answer at the total\'s ones tip', () => {
+    const layout = filled(127, 2385);
+    const totalTip = tip(layout.total!);
+    for (const row of layout.rows) {
+      expect(tip(row.result)).toBe(totalTip);
+      for (const entry of row.resultCards) expect(tip(entry)).toBe(totalTip);
+    }
+  });
+
+  it('ends an overflowing answer at the same tip', () => {
+    const layout = filled(5000, 6000);
+    const thousands = layout.rows.find((row) => row.place === 1000)!;
+    expect(thousands.overflow).toBe(11000);
+    expect(layout.total!.overflow).toBe(11000);
+    expect(layout.total!.cards).toEqual([]);
+    expect(tip(thousands.result)).toBe(tip(layout.total!));
+  });
+
+  it('shows a zero card for a total of nothing', () => {
+    const layout = sumLayout(
+      sum({ left: 'a', right: 'b' }),
+      piece('a', [card(1, 0)]),
+      piece('b', [card(1, 0)]),
+    );
+    expect(layout.total!.cards.map((entry) => [entry.place, entry.digit])).toEqual([[1, 0]]);
+  });
+
+  it('has no = or total until both sides are filled', () => {
+    const layout = sumLayout(sum({ left: 'a' }), piece('a', cardsFor(12)), null);
+    expect(layout.equals).toBeNull();
+    expect(layout.total).toBeNull();
+  });
+
+  it('keeps row cards at row scale', () => {
+    const layout = filled(1234, 5678);
+    for (const row of layout.rows) {
+      expect(row.leftCard.width).toBe(getArrowCardWidth(row.place) * ROW_SCALE);
+    }
   });
 });
 

@@ -2,7 +2,9 @@ import { CARD_HEIGHT, getArrowCardWidth } from 'arrow-cards';
 import {
   SNAP_MIN_OVERLAP,
   layoutPiece,
+  numberToCards,
   overlapOf,
+  pieceValue,
   type Bounds,
   type Card,
   type Piece,
@@ -36,6 +38,11 @@ export const ROW_ITEM_GAP = 10;
 export const EQUALS_SIZE = 32;
 /** Room for a text result such as "11,000" that has no single card. */
 export const OVERFLOW_WIDTH = 92;
+/** The "=" on the numbers' line, between the right number and the total. */
+export const TOTAL_EQUALS_SIZE = 40;
+export const TOTAL_GAP = 14;
+/** Room for a total of 10,000 or more, shown as text at full size. */
+export const TOTAL_OVERFLOW_WIDTH = 132;
 
 export type SumSide = 'left' | 'right';
 
@@ -84,6 +91,14 @@ export interface RowGeometry extends PlaceRow {
   overflow: number | null;
 }
 
+export interface TotalGeometry extends Bounds {
+  value: number;
+  /** Full-size cards stacked on their arrow tips; empty when overflowing. */
+  cards: ResultCardGeometry[];
+  /** Set when the total needs a card larger than thousands. */
+  overflow: number | null;
+}
+
 export interface SumLayout {
   plus: Bounds;
   leftSlot: Bounds;
@@ -91,6 +106,10 @@ export interface SumLayout {
   leftPosition: { x: number; y: number } | null;
   rightPosition: { x: number; y: number } | null;
   rows: RowGeometry[];
+  /** The "=" after the right number, once both sides are filled. */
+  equals: Bounds | null;
+  /** Where the total goes. Its space is kept even while it is hidden. */
+  total: TotalGeometry | null;
   bounds: Bounds;
 }
 
@@ -132,6 +151,18 @@ function pieceWidth(piece: Piece): number {
   return layoutPiece(piece.cards, piece.mode).width;
 }
 
+/** The cards for a whole total: 2,512 is a 2,000 with 500, 10 and 2 on it. */
+export function totalCards(value: number): Array<{ place: Place; digit: number }> {
+  return value === 0 ? [{ place: 1, digit: 0 }] : numberToCards(value);
+}
+
+/**
+ * Lays a sum out like written column addition. Each place row sits above the
+ * numbers with its left card ending at the left number's arrow tip and its
+ * right card ending at the right number's tip. Every "=" shares one column
+ * with the "=" on the numbers' line, and every answer ends at the total's
+ * ones tip, so the columns of the answers line up with the total.
+ */
 export function sumLayout(sum: Sum, left: Piece | null, right: Piece | null): SumLayout {
   const plus: Bounds = {
     x: sum.x,
@@ -155,16 +186,79 @@ export function sumLayout(sum: Sum, left: Piece | null, right: Piece | null): Su
   const leftWidth = left ? pieceWidth(left) : SLOT_WIDTH;
   const rightWidth = right ? pieceWidth(right) : SLOT_WIDTH;
   const leftPosition = left ? { x: sum.x - PLUS_GAP - leftWidth, y: sum.y } : null;
-  const rightPosition = right ? { x: rightSlot.x, y: sum.y } : null;
 
-  const rows = left && right ? layoutRows(sum, placeRows(left.cards, right.cards)) : [];
+  if (!left || !right) {
+    const rightPosition = right ? { x: rightSlot.x, y: sum.y } : null;
+    const minX = sum.x - PLUS_GAP - leftWidth;
+    const maxX = rightSlot.x + rightWidth;
+    return {
+      plus,
+      leftSlot,
+      rightSlot,
+      leftPosition,
+      rightPosition,
+      rows: [],
+      equals: null,
+      total: null,
+      bounds: { x: minX, y: sum.y, width: maxX - minX, height: CARD_HEIGHT },
+    };
+  }
 
-  let minX = sum.x - PLUS_GAP - leftWidth;
-  let maxX = rightSlot.x + rightWidth;
+  const placed = placeRows(left.cards, right.cards);
+  const highest = placed[placed.length - 1].place;
+  const plusCenter = sum.x + PLUS_SIZE / 2;
+  const rowPlusX = plusCenter - ROW_PLUS_SIZE / 2;
+
+  // The right number moves along when the widest row card would not fit
+  // between the row plus and its tip.
+  const widestRowCard = getArrowCardWidth(highest) * ROW_SCALE;
+  const rightTip = Math.max(
+    rightSlot.x + rightWidth,
+    rowPlusX + ROW_PLUS_SIZE + ROW_ITEM_GAP + widestRowCard,
+  );
+  const rightPosition = { x: rightTip - rightWidth, y: sum.y };
+
+  const equals: Bounds = {
+    x: rightTip + TOTAL_GAP,
+    y: sum.y + (CARD_HEIGHT - TOTAL_EQUALS_SIZE) / 2,
+    width: TOTAL_EQUALS_SIZE,
+    height: TOTAL_EQUALS_SIZE,
+  };
+  const equalsCenter = equals.x + TOTAL_EQUALS_SIZE / 2;
+
+  const value = pieceValue(left.cards) + pieceValue(right.cards);
+  const overflow = value > 9999 ? value : null;
+  const cards = overflow === null ? totalCards(value) : [];
+  const totalWidth = cards.length
+    ? Math.max(...cards.map((entry) => getArrowCardWidth(entry.place)))
+    : TOTAL_OVERFLOW_WIDTH;
+  const totalX = equals.x + TOTAL_EQUALS_SIZE + TOTAL_GAP;
+  const totalTip = totalX + totalWidth;
+  const total: TotalGeometry = {
+    x: totalX,
+    y: sum.y,
+    width: totalWidth,
+    height: CARD_HEIGHT,
+    value,
+    overflow,
+    cards: cards.map((entry) => {
+      const width = getArrowCardWidth(entry.place);
+      return { ...entry, x: totalTip - width, y: sum.y, width, height: CARD_HEIGHT };
+    }),
+  };
+
+  const rows = layoutRows(sum, placed, {
+    rowPlusX,
+    leftTip: sum.x - PLUS_GAP,
+    rightTip,
+    equalsCenter,
+    resultTip: totalTip,
+  });
+
+  let minX = leftPosition!.x;
   let minY = sum.y;
   for (const row of rows) {
     minX = Math.min(minX, row.leftCard.x);
-    maxX = Math.max(maxX, row.result.x + row.result.width);
     minY = Math.min(minY, row.y);
   }
 
@@ -175,20 +269,21 @@ export function sumLayout(sum: Sum, left: Piece | null, right: Piece | null): Su
     leftPosition,
     rightPosition,
     rows,
-    bounds: { x: minX, y: minY, width: maxX - minX, height: sum.y + CARD_HEIGHT - minY },
+    equals,
+    total,
+    bounds: { x: minX, y: minY, width: totalTip - minX, height: sum.y + CARD_HEIGHT - minY },
   };
 }
 
-function layoutRows(sum: Sum, rows: PlaceRow[]): RowGeometry[] {
-  if (rows.length === 0) return [];
-  const plusCenter = sum.x + PLUS_SIZE / 2;
-  const plusX = plusCenter - ROW_PLUS_SIZE / 2;
-  const rightX = plusX + ROW_PLUS_SIZE + ROW_ITEM_GAP;
-  // The highest place has the widest card, so every "=" lines up after it.
-  const widestRight = getArrowCardWidth(rows[rows.length - 1].place) * ROW_SCALE;
-  const equalsX = rightX + widestRight + ROW_ITEM_GAP;
-  const resultX = equalsX + EQUALS_SIZE + ROW_ITEM_GAP;
+interface RowColumns {
+  rowPlusX: number;
+  leftTip: number;
+  rightTip: number;
+  equalsCenter: number;
+  resultTip: number;
+}
 
+function layoutRows(sum: Sum, rows: PlaceRow[], columns: RowColumns): RowGeometry[] {
   return rows.map((row, index) => {
     const y = sum.y - ROWS_OFFSET - ROW_HEIGHT - index * (ROW_HEIGHT + ROW_GAP);
     const cardWidth = getArrowCardWidth(row.place) * ROW_SCALE;
@@ -200,28 +295,28 @@ function layoutRows(sum: Sum, rows: PlaceRow[]): RowGeometry[] {
       : OVERFLOW_WIDTH;
     const resultCards = answer.cards.map((entry) => {
       const width = getArrowCardWidth(entry.place) * ROW_SCALE;
-      return { ...entry, x: resultX + resultWidth - width, y, width, height: ROW_HEIGHT };
+      return { ...entry, x: columns.resultTip - width, y, width, height: ROW_HEIGHT };
     });
 
     return {
       ...row,
       y,
       height: ROW_HEIGHT,
-      leftCard: { x: plusX - ROW_ITEM_GAP - cardWidth, y, width: cardWidth, height: ROW_HEIGHT },
-      rightCard: { x: rightX, y, width: cardWidth, height: ROW_HEIGHT },
+      leftCard: { x: columns.leftTip - cardWidth, y, width: cardWidth, height: ROW_HEIGHT },
+      rightCard: { x: columns.rightTip - cardWidth, y, width: cardWidth, height: ROW_HEIGHT },
       plus: {
-        x: plusX,
+        x: columns.rowPlusX,
         y: y + (ROW_HEIGHT - ROW_PLUS_SIZE) / 2,
         width: ROW_PLUS_SIZE,
         height: ROW_PLUS_SIZE,
       },
       equals: {
-        x: equalsX,
+        x: columns.equalsCenter - EQUALS_SIZE / 2,
         y: y + (ROW_HEIGHT - EQUALS_SIZE) / 2,
         width: EQUALS_SIZE,
         height: EQUALS_SIZE,
       },
-      result: { x: resultX, y, width: resultWidth, height: ROW_HEIGHT },
+      result: { x: columns.resultTip - resultWidth, y, width: resultWidth, height: ROW_HEIGHT },
       resultCards,
       overflow: answer.overflow,
     };
