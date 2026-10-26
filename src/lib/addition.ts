@@ -4,6 +4,7 @@ import {
   layoutPiece,
   numberToCards,
   overlapOf,
+  pieceBounds,
   pieceValue,
   type Bounds,
   type Card,
@@ -369,6 +370,32 @@ export function findSumSlot(
   }
 
   return best ? { sum: best.sum, side: best.side } : null;
+}
+
+/**
+ * The other way round from findSumSlot: a plus being dragged picks up a
+ * number lying in one of its empty sides. Numbers already on a plus are
+ * skipped, as are any `taken` ids.
+ */
+export function findSlotPiece(
+  sum: Sum,
+  pieces: Piece[],
+  taken: Set<string> = new Set(),
+): { piece: Piece; side: SumSide } | null {
+  let best: { piece: Piece; side: SumSide; area: number } | null = null;
+
+  for (const side of ['left', 'right'] as const) {
+    if (sum[side]) continue;
+    const zone = attachZone(sum, side);
+    for (const piece of pieces) {
+      if (taken.has(piece.id) || piece.id === sum.left || piece.id === sum.right) continue;
+      const overlap = overlapOf(pieceBounds(piece), zone);
+      if (overlap.x < SNAP_MIN_OVERLAP || overlap.y < SNAP_MIN_OVERLAP) continue;
+      if (!best || overlap.area > best.area) best = { piece, side, area: overlap.area };
+    }
+  }
+
+  return best ? { piece: best.piece, side: best.side } : null;
 }
 
 export function attachedSide(sum: Sum, pieceId: string): SumSide | null {

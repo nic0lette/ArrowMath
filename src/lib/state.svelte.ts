@@ -6,6 +6,7 @@ import {
   ROW_HEIGHT,
   ROWS_OFFSET,
   attachedSide,
+  findSlotPiece,
   findSumSlot,
   isTotalRevealed,
   totalKey,
@@ -1449,6 +1450,17 @@ class ArrowMathStore {
     sum.x = drag.startSum.x + dx;
     sum.y = drag.startSum.y + dy;
     this.settleSum(sum);
+
+    const found = this.slotPieceFor(sum);
+    this.sumHover = found ? { sumId: sum.id, side: found.side } : null;
+  }
+
+  /** A free number lying in one of a sum's empty sides. */
+  private slotPieceFor(sum: Sum): { piece: Piece; side: SumSide } | null {
+    const taken = new Set(
+      this.sums.flatMap((entry) => [entry.left, entry.right]).filter((id): id is string => !!id),
+    );
+    return findSlotPiece(sum, this.pieces, taken);
   }
 
   private endSumDrag(): void {
@@ -1456,7 +1468,17 @@ class ArrowMathStore {
     if (!drag) return;
     this.sumDrag = null;
     const sum = this.sums.find((entry) => entry.id === drag.sumId);
+    this.sumHover = null;
     if (!sum || !drag.moved) return;
+
+    // Dropping the plus on a number puts it on that side, the reverse of
+    // dropping a number on the plus.
+    const found = this.slotPieceFor(sum);
+    if (found) {
+      this.attachPiece(found.piece, sum, found.side);
+      this.selectSum(sum.id);
+      return;
+    }
 
     if (this.snapToGrid) {
       sum.x = snapToGrid(sum.x);

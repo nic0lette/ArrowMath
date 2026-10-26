@@ -308,6 +308,33 @@ test.describe('addition', () => {
     await expect(page.locator('.sum-slot[data-slot="right"]')).toBeVisible();
   });
 
+  /** Drags the plus so the given empty side's slot lands on the piece. */
+  async function dragPlusOnto(page: Page, side: 'left' | 'right', pieceId: string): Promise<void> {
+    const slot = await boxOf(page.locator(`.sum-slot[data-slot="${side}"]`));
+    const target = await pieceBox(page, pieceId);
+    const dx = side === 'left' ? target.x + target.width - (slot.x + slot.width) : target.x - slot.x;
+    const dy = target.y - slot.y;
+    const handle = await boxOf(plus(page));
+    const start = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 };
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + dx, start.y + dy, { steps: 16 });
+    await expect(page.locator(`.sum-slot[data-slot="${side}"]`)).toHaveClass(/aimed/);
+    await page.mouse.up();
+  }
+
+  test('dragging the plus onto numbers puts them on either side', async ({ page }) => {
+    await gotoSeeded(page, [stack('a', 31, 160, 420), stack('b', 205, 760, 220)]);
+    await addPlus(page);
+
+    await dragPlusOnto(page, 'right', 'b');
+    await expect(sum(page)).toHaveAttribute('data-right', 'b');
+
+    await dragPlusOnto(page, 'left', 'a');
+    await expect(sum(page)).toHaveAttribute('data-left', 'a');
+    await expect(page.locator('.sum-row')).toHaveCount(3);
+  });
+
   test('a card dropped from the tray attaches to an empty side', async ({ page }) => {
     await gotoSeeded(page, [stack('a', 3, 40, 40)]);
     await addPlus(page);

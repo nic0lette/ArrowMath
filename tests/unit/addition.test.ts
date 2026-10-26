@@ -6,6 +6,7 @@ import {
   ROW_ITEM_GAP,
   ROW_SCALE,
   findSumSlot,
+  findSlotPiece,
   isTotalRevealed,
   totalKey,
   placeRows,
@@ -322,5 +323,35 @@ describe('findSumSlot', () => {
   it('ignores cards that are nowhere near', () => {
     const dropped = { x: 40, y: 40, width: 86, height: CARD_HEIGHT };
     expect(findSumSlot(dropped, [sum()])).toBeNull();
+  });
+});
+
+describe('findSlotPiece', () => {
+  const width = getArrowCardWidth(1);
+
+  it('picks a number lying in the empty right slot', () => {
+    const number = piece('n', cardsFor(5), 400 + PLUS_SIZE + PLUS_GAP + 4, 304);
+    expect(findSlotPiece(sum(), [number])).toEqual({ piece: number, side: 'right' });
+  });
+
+  it('picks a number lying in the empty left slot', () => {
+    const number = piece('n', cardsFor(5), 400 - PLUS_GAP - width - 6, 296);
+    expect(findSlotPiece(sum(), [number])).toEqual({ piece: number, side: 'left' });
+  });
+
+  it('skips a filled side and numbers already on a plus', () => {
+    const number = piece('n', cardsFor(5), 400 + PLUS_SIZE + PLUS_GAP, 300);
+    expect(findSlotPiece(sum({ right: 'x' }), [number])).toBeNull();
+    expect(findSlotPiece(sum(), [number], new Set(['n']))).toBeNull();
+  });
+
+  it('prefers the number covering more of the slot', () => {
+    const near = piece('near', cardsFor(5), 400 + PLUS_SIZE + PLUS_GAP, 300);
+    const edge = piece('edge', cardsFor(5), 400 + PLUS_SIZE + PLUS_GAP + 80, 340);
+    expect(findSlotPiece(sum(), [edge, near])!.piece.id).toBe('near');
+  });
+
+  it('ignores numbers that are nowhere near', () => {
+    expect(findSlotPiece(sum(), [piece('n', cardsFor(5), 40, 40)])).toBeNull();
   });
 });
