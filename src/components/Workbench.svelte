@@ -158,10 +158,6 @@
         <span class="status-divider"></span>
         <span class="status-count">{countLabel}</span>
       </div>
-      <div class="canvas-tip">
-        <span><i class="tip-dot snap"></i>Overlap to snap</span>
-        <span><i class="tip-dot pull"></i>Digit end pulls out</span>
-      </div>
     </div>
 
     {#if game.pieces.length === 0 && game.sums.length === 0}
@@ -285,8 +281,7 @@
     pointer-events: none;
   }
 
-  .canvas-status,
-  .canvas-tip {
+  .canvas-status {
     display: inline-flex;
     align-items: center;
     height: 28px;
@@ -299,9 +294,6 @@
     letter-spacing: 0.01em;
     box-shadow: 0 1px 1px rgba(15, 23, 42, 0.02);
     backdrop-filter: blur(10px);
-  }
-
-  .canvas-status {
     gap: 7px;
     padding: 0 10px 0 8px;
   }
@@ -332,31 +324,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .canvas-tip {
-    gap: 12px;
-    padding: 0 10px;
-  }
-
-  .canvas-tip span {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  .tip-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-  }
-
-  .tip-dot.snap {
-    background: var(--halo);
-  }
-
-  .tip-dot.pull {
-    background: var(--peel);
-  }
-
   .canvas-corner {
     position: absolute;
     width: 34px;
@@ -383,10 +350,6 @@
   }
 
   @media (max-width: 720px) {
-    .canvas-tip {
-      display: none;
-    }
-
     .workbench {
       border-radius: 18px;
     }
