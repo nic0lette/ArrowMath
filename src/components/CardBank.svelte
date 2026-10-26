@@ -291,8 +291,9 @@
                 <button
                   class="bank-card"
                   class:picked={game.bankDrag?.active &&
-                    game.bankDrag?.card.place === row.place &&
-                    game.bankDrag?.card.digit === digit}
+                    game.bankDrag.source === 'bank' &&
+                    game.bankDrag.cards[0].place === row.place &&
+                    game.bankDrag.cards[0].digit === digit}
                   type="button"
                   style="--card-w: {width}px"
                   aria-label="Add {digit} {row.title.toLowerCase()} card, {digit * row.place}"

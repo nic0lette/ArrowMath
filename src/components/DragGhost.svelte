@@ -4,7 +4,10 @@
   import { game } from '../lib/state.svelte';
 
   const drag = $derived(game.bankDrag);
-  const width = $derived(drag ? getArrowCardWidth(drag.card.place) : 0);
+  // Several cards (a copied answer) stack on their arrow tips, widest first.
+  const width = $derived(
+    drag ? Math.max(...drag.cards.map((card) => getArrowCardWidth(card.place))) : 0,
+  );
   const hint = $derived(
     !drag?.overCanvas
       ? 'Drag onto the workbench'
@@ -27,12 +30,20 @@
     aria-hidden="true"
   >
     <div class="ghost-card">
-      <ArrowCard
-        place={drag.card.place}
-        digit={drag.card.digit}
-        theme={game.theme}
-        idPrefix="ghost-{drag.card.place}-{drag.card.digit}"
-      />
+      {#each drag.cards as card, index (card.place)}
+        <span
+          class="ghost-layer"
+          class:over={index > 0}
+          style:left="{width - getArrowCardWidth(card.place)}px"
+        >
+          <ArrowCard
+            place={card.place}
+            digit={card.digit}
+            theme={game.theme}
+            idPrefix="ghost-{card.place}-{card.digit}"
+          />
+        </span>
+      {/each}
     </div>
     <span class="ghost-hint">
       <span class="ghost-dot"></span>
@@ -56,6 +67,20 @@
     transform-origin: 40% 50%;
     filter: drop-shadow(0 18px 20px rgba(15, 23, 42, 0.25));
     transition: filter 120ms ease;
+  }
+
+  .ghost-card {
+    position: relative;
+  }
+
+  .ghost-layer {
+    display: inline-block;
+    position: relative;
+  }
+
+  .ghost-layer.over {
+    position: absolute;
+    top: 0;
   }
 
   .drag-ghost.conflict .ghost-card {

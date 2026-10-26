@@ -158,8 +158,13 @@
         {:else}
           {#each total.cards as entry (entry.place)}
             <div
-              class="mini-card"
+              class="mini-card copyable"
               data-total-card
+              role="button"
+              tabindex="-1"
+              aria-label="Drag out a copy of {formatNumber(total.value)}"
+              title="Drag out a copy"
+              onpointerdown={(event) => game.beginAnswerDrag(event, total.cards)}
               data-place={entry.place}
               data-digit={entry.digit}
               style:left="{entry.x}px"
@@ -243,8 +248,13 @@
         {:else}
           {#each row.resultCards as result (result.place)}
             <div
-              class="mini-card result"
+              class="mini-card result copyable"
               data-result
+              role="button"
+              tabindex="-1"
+              aria-label="Drag out a copy of {formatNumber(row.left * row.place + row.right * row.place)}"
+              title="Drag out a copy"
+              onpointerdown={(event) => game.beginAnswerDrag(event, row.resultCards)}
               data-place={result.place}
               data-digit={result.digit}
               style:left="{result.x}px"
@@ -406,6 +416,16 @@
     position: absolute;
     line-height: 0;
     animation: row-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .copyable {
+    cursor: grab;
+    pointer-events: auto;
+    touch-action: none;
+  }
+
+  .copyable:active {
+    cursor: grabbing;
   }
 
   .mini-scale {

@@ -199,6 +199,74 @@ test.describe('addition', () => {
     await expect(page.locator('.sum-row')).toHaveCount(2);
   });
 
+  /** Drags from the middle of `from` to an empty spot well above the sum. */
+  async function dragOut(page: Page, from: Locator, dx: number, dy: number): Promise<void> {
+    const box = await boxOf(from);
+    const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 8, start.y - 8, { steps: 3 });
+    await page.mouse.move(start.x + dx, start.y + dy, { steps: 14 });
+    await page.mouse.up();
+  }
+
+  async function digitsOf(page: Page, pieceId: string): Promise<string[][]> {
+    return page
+      .locator(`.card-node[data-piece="${pieceId}"]`)
+      .evaluateAll((nodes) =>
+        nodes.map((node) => [node.getAttribute('data-place')!, node.getAttribute('data-digit')!]),
+      );
+  }
+
+  test('dragging a column answer pulls out a full-size copy', async ({ page }) => {
+    await gotoSeeded(page, [stack('a', 4, 400, 520), stack('b', 8, 900, 520)]);
+    await addPlus(page);
+    await dropIntoSlot(page, 'a', 'left');
+    await dropIntoSlot(page, 'b', 'right');
+    const row = page.locator('.sum-row[data-row-place="1"]');
+    await row.getByRole('button', { name: 'Show 4 + 8' }).click();
+
+    await dragOut(page, row.locator('[data-result]').last(), 0, -260);
+
+    await expect(workbench(page)).toHaveAttribute('data-piece-count', '3');
+    const copyId = (await page.locator('.card-node').evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute('data-piece')).find((id) => id !== 'a' && id !== 'b'),
+    ))!;
+    expect(await digitsOf(page, copyId)).toEqual([
+      ['10', '1'],
+      ['1', '2'],
+    ]);
+    expect((await boxOf(page.locator(`.card-node[data-piece="${copyId}"]`).first())).height).toBeCloseTo(68, 0);
+    // The answer stays where it was.
+    await expect(row.locator('[data-result]')).toHaveCount(2);
+  });
+
+  test('dragging the total pulls out a copy of the whole number', async ({ page }) => {
+    await gotoSeeded(page, [stack('a', 127, 300, 560), stack('b', 2385, 900, 560)]);
+    await addPlus(page);
+    await dropIntoSlot(page, 'a', 'left');
+    await dropIntoSlot(page, 'b', 'right');
+    await page.getByRole('button', { name: 'Hide the place rows' }).click();
+    await page.getByRole('button', { name: 'Show 127 + 2,385' }).click();
+
+    await dragOut(page, page.locator('[data-total-card]').first(), -40, -320);
+
+    await expect(workbench(page)).toHaveAttribute('data-piece-count', '3');
+    await expect(workbench(page)).toHaveAttribute('data-card-count', '11');
+  });
+
+  test('tapping an answer does not add a copy', async ({ page }) => {
+    await gotoSeeded(page, [stack('a', 4, 400, 520), stack('b', 8, 900, 520)]);
+    await addPlus(page);
+    await dropIntoSlot(page, 'a', 'left');
+    await dropIntoSlot(page, 'b', 'right');
+    const row = page.locator('.sum-row[data-row-place="1"]');
+    await row.getByRole('button', { name: 'Show 4 + 8' }).click();
+    await row.locator('[data-result]').last().click();
+    await page.waitForTimeout(200);
+    await expect(workbench(page)).toHaveAttribute('data-piece-count', '2');
+  });
+
   test('a place one number leaves out shows as a zero card', async ({ page }) => {
     await gotoSeeded(page, [stack('a', 123, 40, 40), stack('b', 205, 900, 40)]);
     await addPlus(page);

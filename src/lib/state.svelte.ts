@@ -115,7 +115,10 @@ interface DragState {
 }
 
 export interface BankDragState {
-  card: { place: Place; digit: number };
+  /** One card from the tray, or every card of an answer being copied. */
+  cards: BankCardSource[];
+  /** A tap on a tray card adds it; a tap on an answer does nothing. */
+  source: 'bank' | 'answer';
   pointerId: number;
   startClientX: number;
   startClientY: number;
@@ -221,6 +224,11 @@ function isPointInRect(x: number, y: number, rect: { left: number; top: number; 
 }
 
 /** One shared warning for bank drops and dragging into a taken column. */
+/** Copies stack on their arrow tips, so the widest card sets the width. */
+function copyWidth(cards: Array<{ place: Place }>): number {
+  return Math.max(...cards.map((card) => getArrowCardWidth(card.place)));
+}
+
 function duplicatePlaceMessage(place: Place | null): string {
   const column = place ? placeTier(place) : 'place value';
   return `The ${column} column already has a card — same place values bounce apart. Pull the old card out from its digit end to change it.`;
@@ -546,18 +554,37 @@ class ArrowMathStore {
   // ---------------------------------------------------------------------------
 
   beginBankDrag(event: PointerEvent, card: BankCardSource): void {
-    if (this.drag || this.bankDrag) return;
+    this.beginCopyDrag(event, [card], 'bank');
+  }
+
+  /**
+   * Drags a full-size copy of an addition's answer (a column's cards or the
+   * whole total) onto the bench. It drops exactly like a tray card would.
+   */
+  beginAnswerDrag(event: PointerEvent, cards: BankCardSource[]): void {
+    if (cards.length === 0) return;
+    event.stopPropagation();
+    this.beginCopyDrag(event, cards, 'answer');
+  }
+
+  private beginCopyDrag(
+    event: PointerEvent,
+    cards: BankCardSource[],
+    source: BankDragState['source'],
+  ): void {
+    if (this.drag || this.bankDrag || this.sumDrag) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     this.measureCanvas();
 
-    const width = getArrowCardWidth(card.place);
+    const width = copyWidth(cards);
     const rect = this.canvasRect;
     const ghostX = event.clientX - width / 2;
     const ghostY = event.clientY - CARD_HEIGHT / 2;
 
     this.selectedSumId = null;
     this.bankDrag = {
-      card: { place: card.place, digit: card.digit },
+      cards: cards.map((card) => ({ place: card.place, digit: card.digit })),
+      source,
       pointerId: event.pointerId,
       startClientX: event.clientX,
       startClientY: event.clientY,
@@ -597,7 +624,7 @@ class ArrowMathStore {
     if (!drag.active && distance < 5) return;
 
     drag.active = true;
-    const width = getArrowCardWidth(drag.card.place);
+    const width = copyWidth(drag.cards);
     drag.ghostX = clientX - width / 2;
     drag.ghostY = clientY - CARD_HEIGHT / 2;
     drag.ghostCanvasX = drag.ghostX - this.canvasRect.left;
@@ -613,7 +640,7 @@ class ArrowMathStore {
     }
 
     const preview = makePiece(
-      [{ id: 'preview', place: drag.card.place, digit: drag.card.digit }],
+      drag.cards.map((card, index) => ({ id: `preview-${index}`, ...card })),
       clamp(drag.ghostCanvasX, CANVAS_PADDING, Math.max(CANVAS_PADDING, this.canvas.width - width - CANVAS_PADDING)),
       clamp(
         drag.ghostCanvasY,
@@ -685,8 +712,8 @@ class ArrowMathStore {
   private dropBankCard(drag: BankDragState, clientX: number, clientY: number): void {
     if (!isPointInRect(clientX, clientY, this.canvasRect)) return;
 
-    const incoming = makeCard(drag.card.place, drag.card.digit);
-    const width = getArrowCardWidth(incoming.place);
+    const incoming = drag.cards.map((card) => makeCard(card.place, card.digit));
+    const width = copyWidth(incoming);
     const canvasX = clamp(
       drag.ghostCanvasX,
       CANVAS_PADDING,
@@ -698,7 +725,7 @@ class ArrowMathStore {
       Math.max(CANVAS_PADDING, this.canvas.height - CARD_HEIGHT - CANVAS_PADDING),
     );
 
-    const preview = makePiece([incoming], canvasX, canvasY, 'stack', this.maxZ() + 1);
+    const preview = makePiece(incoming, canvasX, canvasY, 'stack', this.maxZ() + 1);
     const slot = findSumSlot(pieceBounds(preview), this.sums);
     if (slot) {
       this.pieces.push(preview);
@@ -727,7 +754,10 @@ class ArrowMathStore {
       this.applySpring(preview, 'bounce');
       this.selectedId = preview.id;
       this.hover = null;
-      this.notify(duplicatePlaceMessage(incoming.place), 'warning');
+      const clash = incoming.find((card) =>
+        candidate.target.cards.some((other) => other.place === card.place),
+      );
+      this.notify(duplicatePlaceMessage(clash?.place ?? null), 'warning');
       audio.bounce();
       return;
     }
@@ -1211,8 +1241,8 @@ class ArrowMathStore {
       this.intent = null;
       if (drag.active) {
         this.dropBankCard(drag, event.clientX, event.clientY);
-      } else {
-        this.addBankCard(drag.card);
+      } else if (drag.source === 'bank') {
+        this.addBankCard(drag.cards[0]);
       }
       return;
     }
