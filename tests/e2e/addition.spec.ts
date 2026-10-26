@@ -308,6 +308,33 @@ test.describe('addition', () => {
     await expect(workbench(page)).toHaveAttribute('data-piece-count', '2');
   });
 
+  test('with words on, a revealed total is written in words under it', async ({ page }) => {
+    await gotoSeeded(page, [stack('a', 127, 40, 40), stack('b', 2385, 900, 40)], { words: true });
+    await addPlus(page);
+    await dropIntoSlot(page, 'a', 'left');
+    await dropIntoSlot(page, 'b', 'right');
+
+    const words = page.locator('.total-words');
+    await expect(words).toHaveCount(0);
+    await page.getByRole('button', { name: 'Show 127 + 2,385' }).click();
+    await expect(words).toHaveText('Two thousand five hundred twelve');
+
+    // The cards slide up a few pixels as they appear, so wait for them to land.
+    const gap = async () => {
+      const card = await boxOf(page.locator('[data-total-card]').first());
+      const text = await boxOf(words);
+      return { below: text.y - (card.y + card.height), left: Math.round(text.x - card.x) };
+    };
+    await expect.poll(async () => (await gap()).below).toBeGreaterThanOrEqual(0);
+    expect((await gap()).left).toBe(0);
+
+    await page.getByRole('button', { name: 'Hide 127 + 2,385' }).click();
+    await expect(words).toHaveCount(0);
+    await page.getByRole('button', { name: 'Show 127 + 2,385' }).click();
+    await page.getByRole('button', { name: 'Number words' }).click();
+    await expect(words).toHaveCount(0);
+  });
+
   test('a place one number leaves out shows as a zero card', async ({ page }) => {
     await gotoSeeded(page, [stack('a', 123, 40, 40), stack('b', 205, 900, 40)]);
     await addPlus(page);

@@ -545,27 +545,30 @@ const WORDS_UNDER_TWENTY = [
 ];
 const WORDS_TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
 
+/** 0–99 in words, e.g. 42 → "forty-two". */
+function wordsUnderHundred(value: number): string {
+  if (value < 20) return WORDS_UNDER_TWENTY[value];
+  const ones = value % 10;
+  return WORDS_TENS[Math.floor(value / 10)] + (ones ? `-${WORDS_UNDER_TWENTY[ones]}` : '');
+}
+
 /**
- * Writes a piece's value in words, e.g. 4325 → "Four thousand three hundred
- * twenty-five". Empty places are left out rather than read as zero. English
- * only for now (see the locale TODO on formatNumber).
+ * Writes a value in words, e.g. 4325 → "Four thousand three hundred
+ * twenty-five". Covers pieces and addition totals (up to 19,998, and on to
+ * 99,999). Empty places are left out rather than read as zero. English only
+ * for now (see the locale TODO on formatNumber).
  */
 export function numberToWords(value: number): string {
-  if (!Number.isInteger(value) || value < 0 || value > 9999) return formatNumber(value);
+  if (!Number.isInteger(value) || value < 0 || value > 99999) return formatNumber(value);
   if (value === 0) return 'Zero';
 
   const thousands = Math.floor(value / 1000);
   const hundreds = Math.floor(value / 100) % 10;
   const rest = value % 100;
   const parts: string[] = [];
-  if (thousands) parts.push(`${WORDS_UNDER_TWENTY[thousands]} thousand`);
+  if (thousands) parts.push(`${wordsUnderHundred(thousands)} thousand`);
   if (hundreds) parts.push(`${WORDS_UNDER_TWENTY[hundreds]} hundred`);
-  if (rest >= 20) {
-    const ones = rest % 10;
-    parts.push(WORDS_TENS[Math.floor(rest / 10)] + (ones ? `-${WORDS_UNDER_TWENTY[ones]}` : ''));
-  } else if (rest) {
-    parts.push(WORDS_UNDER_TWENTY[rest]);
-  }
+  if (rest) parts.push(wordsUnderHundred(rest));
 
   const text = parts.join(' ');
   return text.charAt(0).toUpperCase() + text.slice(1);

@@ -350,6 +350,12 @@ describe('number helpers', () => {
 });
 
 describe('numberToWords', () => {
+  it('names the totals an addition can reach, up to 19,998', () => {
+    expect(numberToWords(10000)).toBe('Ten thousand');
+    expect(numberToWords(11012)).toBe('Eleven thousand twelve');
+    expect(numberToWords(19998)).toBe('Nineteen thousand nine hundred ninety-eight');
+  });
+
   it('names every value a piece can hold, in sentence case', () => {
     expect(numberToWords(4325)).toBe('Four thousand three hundred twenty-five');
     expect(numberToWords(9999)).toBe('Nine thousand nine hundred ninety-nine');

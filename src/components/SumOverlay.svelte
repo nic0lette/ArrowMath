@@ -10,7 +10,7 @@
     type AnswerCard,
     type Sum,
   } from '../lib/addition';
-  import { formatNumber, pieceValue } from '../lib/geometry';
+  import { formatNumber, numberToWords, pieceValue } from '../lib/geometry';
 
   interface Props {
     sum: Sum;
@@ -22,6 +22,18 @@
   const right = $derived(game.pieces.find((piece) => piece.id === sum.right) ?? null);
   const layout = $derived(sumLayout(sum, left, right));
   const totalShown = $derived(isTotalRevealed(sum, left, right));
+  // Like a number's words: under the total, or above it near the bottom edge
+  // (the gap up to the ones row is just tall enough).
+  const WORDS_GAP = 4;
+  const WORDS_HEIGHT = 20;
+  const totalWordsTop = $derived.by(() => {
+    const total = layout.total;
+    if (!total) return 0;
+    const below = total.y + total.height + WORDS_GAP;
+    return below + WORDS_HEIGHT <= game.canvas.height - 4
+      ? below
+      : total.y - WORDS_GAP - WORDS_HEIGHT;
+  });
   const selected = $derived(game.selectedSumId === sum.id && !game.selectedId);
   const label = $derived(
     left && right
@@ -191,6 +203,11 @@
             />
           </div>
         {/each}
+        {#if game.showWords}
+          <span class="total-words" style:left="{total.x}px" style:top="{totalWordsTop}px"
+            >{numberToWords(total.value)}</span
+          >
+        {/if}
       </div>
     {/if}
   {/if}
@@ -497,6 +514,19 @@
   .row-equals:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+
+  /* Matches .piece-words under ordinary numbers. */
+  .total-words {
+    position: absolute;
+    height: 20px;
+    color: var(--muted-strong);
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 20px;
+    letter-spacing: 0.005em;
+    white-space: nowrap;
+    pointer-events: none;
   }
 
   @keyframes row-in {
