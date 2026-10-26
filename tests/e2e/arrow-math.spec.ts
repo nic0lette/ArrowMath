@@ -688,14 +688,15 @@ test('chaining near the right edge keeps the cards and the sum on the workbench'
   await gotoSeeded(page, [
     { id: 'ones', cards: [{ id: 'c-ones', place: 1, digit: 5 }], x: 300, y: 300 },
   ]);
-  const layer = await boxOf(cardsLayer(page));
+  // The bench scrolls sideways, so its right edge is the edge of the part in view.
+  const viewWidth = await page.locator('[data-workbench-scroll]').evaluate((node) => node.clientWidth);
   // Leave just enough room on the right for the 5 to touch the 4,000's edge.
   await gotoSeeded(page, [
     { id: 'ones', cards: [{ id: 'c-ones', place: 1, digit: 5 }], x: 300, y: 300 },
     {
       id: 'thousands',
       cards: [{ id: 'c-thousands', place: 1000, digit: 4 }],
-      x: Math.round(layer.width - 16 - 260 - 90),
+      x: Math.round(viewWidth - 16 - 260 - 90),
       y: 300,
     },
   ]);

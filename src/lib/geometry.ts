@@ -483,15 +483,20 @@ export function findFreeSpot(options: {
   ignoreId?: string;
   /** Other areas to keep clear, such as a plus and its place rows. */
   obstacles?: Bounds[];
+  /** Where to look, such as the part of a scrolled bench in view. */
+  area?: Bounds;
 }): { x: number; y: number } {
   const { width, height, pieces, canvas, ignoreId, obstacles = [] } = options;
+  const area = options.area ?? { x: 0, y: 0, width: canvas.width, height: canvas.height };
   const pad = Math.max(CANVAS_PADDING, 20);
   const step = GRID_SIZE;
-  const maxX = Math.max(pad, canvas.width - width - pad);
-  const maxY = Math.max(pad, canvas.height - height - pad);
+  const minX = area.x + pad;
+  const minY = area.y + pad;
+  const maxX = Math.max(minX, area.x + area.width - width - pad);
+  const maxY = Math.max(minY, area.y + area.height - height - pad);
   const preferred = {
-    x: clamp(canvas.width * 0.5 - width * 0.5, pad, maxX),
-    y: clamp(canvas.height * 0.45 - height * 0.5, pad, maxY),
+    x: clamp(area.x + area.width * 0.5 - width * 0.5, minX, maxX),
+    y: clamp(area.y + area.height * 0.45 - height * 0.5, minY, maxY),
   };
   const others = pieces
     .filter((piece) => piece.id !== ignoreId)
@@ -512,8 +517,8 @@ export function findFreeSpot(options: {
   // one wins, rather than dropping the new item on top of everything.
   let bestCovered = Number.POSITIVE_INFINITY;
 
-  for (let y = pad; y <= maxY; y += step) {
-    for (let x = pad; x <= maxX; x += step) {
+  for (let y = minY; y <= maxY; y += step) {
+    for (let x = minX; x <= maxX; x += step) {
       const candidate: Bounds = { x, y, width, height };
       const covered = others.reduce((total, other) => total + overlapOf(candidate, other).area, 0);
       if (covered > bestCovered) continue;

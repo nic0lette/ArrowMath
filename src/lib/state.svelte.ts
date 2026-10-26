@@ -16,6 +16,7 @@ import {
   type SumSide,
 } from './addition';
 import { audio } from './audio';
+import { WORLD_WIDTH, edgeScrollSpeed, scrollWidth } from './scroll';
 import {
   deserializeBoard,
   flushBoard,
@@ -265,6 +266,8 @@ class ArrowMathStore {
   hoveredId = $state<string | null>(null);
   toast = $state<Toast | null>(null);
   canvas = $state<CanvasSize>({ width: 1200, height: 560 });
+  /** The part of the bench in view, in bench coordinates. */
+  view = $state<Bounds>({ x: 0, y: 0, width: 1200, height: 560 });
 
   private drag = $state<DragState | null>(null);
   private sumDrag = $state<SumDragState | null>(null);
@@ -273,6 +276,11 @@ class ArrowMathStore {
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
   private canvasEl: HTMLElement | null = null;
   private canvasRect = { left: 0, top: 0, width: 1200, height: 560 };
+  /** The part of the bench on screen, in screen coordinates. */
+  private viewRect = { left: 0, top: 0, width: 1200, height: 560 };
+  /** The latest pointer position during a drag, replayed when the bench scrolls. */
+  private dragPointer: { clientX: number; clientY: number } | null = null;
+  private edgeScrollFrame = 0;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private toastDuration = 0;
   private toastShownAt = 0;
@@ -443,9 +451,14 @@ class ArrowMathStore {
 
     const observer = new ResizeObserver(() => this.measureCanvas());
     observer.observe(element);
+    const scroller = element.querySelector<HTMLElement>('[data-workbench-scroll]');
+    const onScroll = () => this.onBenchScroll();
+    scroller?.addEventListener('scroll', onScroll, { passive: true });
 
     return () => {
       observer.disconnect();
+      scroller?.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(this.edgeScrollFrame);
       if (this.canvasEl === element) this.canvasEl = null;
     };
   }
@@ -471,12 +484,28 @@ class ArrowMathStore {
     // The card layer is the actual coordinate system for pieces. Measuring the
     // workbench's border box instead would add its 1px border to every synced
     // position, which makes a single card creep by 1px on each click.
+    // The layer scrolls sideways inside the scroller, so its left edge can be
+    // far off screen; it still maps the pointer into bench coordinates.
     const layer = this.canvasEl.querySelector<HTMLElement>('.cards-layer');
+    const scroller = this.canvasEl.querySelector<HTMLElement>('[data-workbench-scroll]');
     const rect = (layer ?? this.canvasEl).getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
 
     this.canvasRect = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
-    const width = Math.round(rect.width);
+    const viewRect = (scroller ?? layer ?? this.canvasEl).getBoundingClientRect();
+    const viewWidth = scroller ? scroller.clientWidth : rect.width;
+    this.viewRect = { left: viewRect.left, top: rect.top, width: viewWidth, height: rect.height };
+    const viewX = Math.max(0, viewRect.left - rect.left);
+    if (
+      viewX !== this.view.x ||
+      viewWidth !== this.view.width ||
+      rect.height !== this.view.height
+    ) {
+      this.view = { x: viewX, y: 0, width: viewWidth, height: rect.height };
+    }
+
+    // Pieces may go anywhere across the world's width; the scroller follows.
+    const width = Math.max(WORLD_WIDTH, Math.round(viewWidth));
     const height = Math.round(rect.height);
     if (width !== this.canvas.width || height !== this.canvas.height) {
       this.canvas = { width, height };
@@ -510,6 +539,50 @@ class ArrowMathStore {
       piece.y = clamp(piece.y, CANVAS_PADDING, Math.max(CANVAS_PADDING, maxY));
     }
     this.settleSums();
+  }
+
+  /** How wide the scrollable bench is: the view, or past the furthest piece. */
+  get scrollWidth(): number {
+    return scrollWidth(
+      [...this.pieces.map((piece) => pieceVisualBounds(piece)), ...this.sumBounds()],
+      this.view,
+    );
+  }
+
+  /**
+   * A scroll moves the bench under a pointer that has not moved, so a drag in
+   * progress is replayed at the same screen position to keep up.
+   */
+  private onBenchScroll(): void {
+    this.measureCanvas();
+    const pointer = this.dragPointer;
+    if (!pointer) return;
+    if (this.bankDrag?.active) this.updateBankDrag(pointer.clientX, pointer.clientY);
+    else if (this.drag) this.updatePieceDrag(pointer.clientX, pointer.clientY);
+    else if (this.sumDrag) this.updateSumDrag(pointer.clientX, pointer.clientY);
+  }
+
+  /** Scrolls the bench while a drag is held near its left or right edge. */
+  private edgeScroll(clientX: number, clientY: number): void {
+    this.dragPointer = { clientX, clientY };
+    if (this.edgeScrollFrame) return;
+
+    const step = () => {
+      this.edgeScrollFrame = 0;
+      const pointer = this.dragPointer;
+      const scroller = this.canvasEl?.querySelector<HTMLElement>('[data-workbench-scroll]');
+      const dragging = Boolean(this.drag?.moved || this.sumDrag?.moved || this.bankDrag?.active);
+      if (!pointer || !scroller || !dragging) return;
+      // A tray drag only scrolls once it is over the bench, not the tray.
+      if (this.bankDrag && !this.bankDrag.overCanvas) return;
+
+      const speed = edgeScrollSpeed(pointer.clientX, this.viewRect);
+      if (speed === 0) return;
+      const before = scroller.scrollLeft;
+      scroller.scrollLeft = before + speed;
+      if (scroller.scrollLeft !== before) this.edgeScrollFrame = requestAnimationFrame(step);
+    };
+    this.edgeScrollFrame = requestAnimationFrame(step);
   }
 
   private clientToCanvas(clientX: number, clientY: number): { x: number; y: number } {
@@ -631,7 +704,7 @@ class ArrowMathStore {
     drag.ghostCanvasX = drag.ghostX - this.canvasRect.left;
     drag.ghostCanvasY = drag.ghostY - this.canvasRect.top;
 
-    const inside = isPointInRect(clientX, clientY, this.canvasRect);
+    const inside = isPointInRect(clientX, clientY, this.viewRect);
     drag.overCanvas = inside;
 
     if (!inside) {
@@ -677,6 +750,7 @@ class ArrowMathStore {
       pieces: this.pieces,
       obstacles: this.sumBounds(),
       canvas: this.canvas,
+      area: this.view,
     });
     const piece = makePiece([incoming], spot.x, spot.y, 'stack', this.maxZ() + 1);
     this.pieces.push(piece);
@@ -711,7 +785,7 @@ class ArrowMathStore {
   }
 
   private dropBankCard(drag: BankDragState, clientX: number, clientY: number): void {
-    if (!isPointInRect(clientX, clientY, this.canvasRect)) return;
+    if (!isPointInRect(clientX, clientY, this.viewRect)) return;
 
     const incoming = drag.cards.map((card) => makeCard(card.place, card.digit));
     const width = copyWidth(incoming);
@@ -1218,18 +1292,22 @@ class ArrowMathStore {
     this.intentRefreshToken += 1;
     if (this.bankDrag && event.pointerId === this.bankDrag.pointerId) {
       this.updateBankDrag(event.clientX, event.clientY);
+      this.edgeScroll(event.clientX, event.clientY);
       return;
     }
     if (this.drag && event.pointerId === this.drag.pointerId) {
       this.updatePieceDrag(event.clientX, event.clientY);
+      this.edgeScroll(event.clientX, event.clientY);
       return;
     }
     if (this.sumDrag && event.pointerId === this.sumDrag.pointerId) {
       this.updateSumDrag(event.clientX, event.clientY);
+      this.edgeScroll(event.clientX, event.clientY);
     }
   };
 
   handlePointerUp = (event: PointerEvent): void => {
+    this.dragPointer = null;
     if (this.sumDrag && event.pointerId === this.sumDrag.pointerId) {
       this.endSumDrag();
       return;
@@ -1318,6 +1396,7 @@ class ArrowMathStore {
       pieces: this.pieces,
       obstacles: this.sumBounds(),
       canvas: this.canvas,
+      area: this.view,
     });
     const sum: Sum = {
       id: makeId('sum'),
@@ -1671,15 +1750,18 @@ class ArrowMathStore {
     const pad = 32;
     const gap = 34;
     const rowGap = 58;
-    let x = pad;
+    // Rows fill the part of the bench in view.
+    const left = this.view.x + pad;
+    const right = this.view.x + this.view.width - pad;
+    let x = left;
     let y = 76;
     let rowHeight = CARD_HEIGHT;
 
     for (const piece of ordered) {
       const bounds = pieceBounds(piece);
       const visualWidth = pieceVisualWidth(piece);
-      if (x > pad && x + visualWidth > this.canvas.width - pad) {
-        x = pad;
+      if (x > left && x + visualWidth > right) {
+        x = left;
         y += rowHeight + rowGap;
         rowHeight = CARD_HEIGHT;
       }
@@ -1749,6 +1831,7 @@ class ArrowMathStore {
       pieces: this.pieces,
       obstacles: this.sumBounds(),
       canvas: this.canvas,
+      area: this.view,
     });
     const piece = makePiece(cards, spot.x, spot.y, mode, this.maxZ() + 1);
     this.pieces.push(piece);
@@ -1776,7 +1859,7 @@ class ArrowMathStore {
     const cards = entries.map(({ place, digit }) => makeCard(place, digit));
     const gap = 20;
     const widths = cards.map((card) => getArrowCardWidth(card.place));
-    const availableWidth = Math.max(220, this.canvas.width - 80);
+    const availableWidth = Math.max(220, this.view.width - 80);
     const rows: Array<{ cards: Card[]; widths: number[]; width: number }> = [];
     let current: { cards: Card[]; widths: number[]; width: number } = { cards: [], widths: [], width: 0 };
 
@@ -1803,6 +1886,7 @@ class ArrowMathStore {
       pieces: this.pieces,
       obstacles: this.sumBounds(),
       canvas: this.canvas,
+      area: this.view,
     });
 
     let y = spot.y;

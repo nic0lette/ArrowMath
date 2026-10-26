@@ -390,4 +390,14 @@ describe('findFreeSpot', () => {
     const spot = findFreeSpot({ width: 200, height: 60, pieces: [], canvas, obstacles });
     expect(spot.x).toBeLessThan(60);
   });
+
+  it('searches only the given area, such as the part of the bench in view', () => {
+    const canvas = { width: 6000, height: 400 };
+    const area = { x: 2000, y: 0, width: 600, height: 400 };
+    const spot = findFreeSpot({ width: 100, height: 60, pieces: [], canvas, area });
+    expect(spot.x).toBeGreaterThanOrEqual(2000);
+    expect(spot.x + 100).toBeLessThanOrEqual(2600);
+    // Centred in the area, as it would be on an unscrolled bench.
+    expect(Math.abs(spot.x + 50 - 2300)).toBeLessThanOrEqual(24);
+  });
 });

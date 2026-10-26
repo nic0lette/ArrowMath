@@ -83,6 +83,56 @@
     game.clearSelection();
   }
 
+  /**
+   * A mouse drag on the empty bench pans it sideways. Touch pans natively
+   * (the scroller allows pan-x), so only mouse and pen are handled here.
+   */
+  let pan: { pointerId: number; startX: number; startScroll: number } | null = null;
+
+  function onScrollerPointerDown(event: PointerEvent) {
+    if (event.pointerType === 'touch' || event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('.card-node, .piece-chrome, [data-sum-handle], .copyable, button, input, a')) return;
+    const scroller = event.currentTarget as HTMLElement;
+    if (scroller.scrollWidth <= scroller.clientWidth) return;
+    pan = { pointerId: event.pointerId, startX: event.clientX, startScroll: scroller.scrollLeft };
+    scroller.setPointerCapture(event.pointerId);
+  }
+
+  function onScrollerPointerMove(event: PointerEvent) {
+    if (!pan || event.pointerId !== pan.pointerId) return;
+    const scroller = event.currentTarget as HTMLElement;
+    scroller.scrollLeft = pan.startScroll - (event.clientX - pan.startX);
+  }
+
+  function endPan(event: PointerEvent) {
+    if (pan && event.pointerId === pan.pointerId) pan = null;
+  }
+
+  /**
+   * The bench only scrolls sideways, so an ordinary up/down mouse wheel (or
+   * trackpad swipe) scrolls it left and right. Sideways swipes and
+   * Shift+wheel already do; Ctrl+wheel is left alone for zooming.
+   */
+  function wheelScrollsSideways(node: HTMLElement) {
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.shiftKey) return;
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      if (node.scrollWidth <= node.clientWidth) return;
+      const scale =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? node.clientWidth
+            : 1;
+      node.scrollLeft += event.deltaY * scale;
+      event.preventDefault();
+    };
+    // Not passive: the page itself must not scroll as well.
+    node.addEventListener('wheel', onWheel, { passive: false });
+    return { destroy: () => node.removeEventListener('wheel', onWheel) };
+  }
+
   function onCanvasPointerLeave() {
     if (!game.isInteracting) game.clearIntent();
   }
@@ -118,6 +168,17 @@
       <EmptyState />
     {/if}
 
+    <div
+      class="workbench-scroll"
+      role="presentation"
+      data-workbench-scroll
+      use:wheelScrollsSideways
+      onpointerdown={onScrollerPointerDown}
+      onpointermove={onScrollerPointerMove}
+      onpointerup={endPan}
+      onpointercancel={endPan}
+    >
+    <div class="workbench-content" style:width="{game.scrollWidth}px">
     <div class="cards-layer">
       {#each game.sums as sum (sum.id)}
         <SumOverlay {sum} />
@@ -147,6 +208,8 @@
     {#if game.hover}
       <HoverHalo />
     {/if}
+    </div>
+    </div>
 
     <span class="canvas-corner corner-tl" aria-hidden="true"></span>
     <span class="canvas-corner corner-br" aria-hidden="true"></span>
@@ -169,14 +232,7 @@
     border: 1px solid var(--line);
     border-radius: 24px;
     background-color: var(--canvas-bg);
-    background-image:
-      linear-gradient(to right, var(--canvas-grid) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--canvas-grid) 1px, transparent 1px),
-      radial-gradient(circle at 20% -10%, var(--canvas-glow) 0%, transparent 55%);
-    background-size:
-      24px 24px,
-      24px 24px,
-      100% 100%;
+    background-image: radial-gradient(circle at 20% -10%, var(--canvas-glow) 0%, transparent 55%);
     box-shadow:
       var(--shadow-sm),
       inset 0 1px 0 rgba(255, 255, 255, 0.55);
@@ -184,6 +240,30 @@
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  /* No z-index on the scroller or its content, so cards, toolbars and the
+     canvas head still share the workbench's stacking context. */
+  .workbench-scroll {
+    position: absolute;
+    inset: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    /* Empty bench pans sideways on touch; cards keep touch-action: none. */
+    touch-action: pan-x;
+  }
+
+  .workbench-content {
+    position: relative;
+    min-width: 100%;
+    height: 100%;
+    /* The grid scrolls with the cards, so grid snapping still lines up. */
+    background-image:
+      linear-gradient(to right, var(--canvas-grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--canvas-grid) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 
   .cards-layer {
