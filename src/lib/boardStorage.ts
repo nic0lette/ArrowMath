@@ -2,12 +2,17 @@ import type { Sum } from './addition';
 import { sortCards, type Card, type Piece, type PieceMode, type Place } from './geometry';
 
 /**
- * The board (pieces) persists to localStorage so a lesson survives a page
- * refresh. Preferences live under `arrow-math:preferences` in state.svelte.ts;
- * this module owns `arrow-math:workbench`. Everything here is pure data with no
- * runes, so it stays unit-testable.
+ * The lesson (every board, each with its pieces and sums) persists to
+ * localStorage so it survives a page refresh. Preferences live under
+ * `arrow-math:preferences` in state.svelte.ts; this module owns
+ * `arrow-math:lesson`, and reads the older single-board `arrow-math:workbench`
+ * once to migrate it. Everything here is pure data with no runes, so it stays
+ * unit-testable.
  */
 
+export const LESSON_KEY = 'arrow-math:lesson';
+export const LESSON_VERSION = 2;
+/** Where a single board was saved before lessons existed. */
 export const BOARD_KEY = 'arrow-math:workbench';
 export const BOARD_VERSION = 1;
 
@@ -38,10 +43,45 @@ interface StoredSum {
 }
 
 export interface StoredBoard {
-  version: number;
   pieces: StoredPiece[];
   /** Added after version 1 shipped; older boards simply have no sums. */
   sums?: StoredSum[];
+}
+
+interface StoredLessonBoard extends StoredBoard {
+  id: string;
+  name: string;
+  /** The layout the teacher saved; absent until they save one. */
+  start?: StoredBoard;
+}
+
+export interface StoredLesson {
+  version: number;
+  activeBoardId: string;
+  boards: StoredLessonBoard[];
+}
+
+export interface BoardState {
+  pieces: Piece[];
+  sums: Sum[];
+}
+
+export interface LessonBoard extends BoardState {
+  id: string;
+  name: string;
+  /** The layout Reset brings back, or null if the teacher never saved one. */
+  start: BoardState | null;
+}
+
+export interface Lesson {
+  boards: LessonBoard[];
+  activeBoardId: string;
+}
+
+export const MAX_BOARD_NAME = 60;
+
+export function defaultBoardName(index: number): string {
+  return `Board ${index + 1}`;
 }
 
 const PLACES: Place[] = [1000, 100, 10, 1];
@@ -59,10 +99,9 @@ function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Pushes the current board into storage as `{ version, pieces, sums }`. */
+/** Turns one board into plain `{ pieces, sums }` data for storage. */
 export function serializeBoard(pieces: Piece[], sums: Sum[] = []): StoredBoard {
   return {
-    version: BOARD_VERSION,
     pieces: pieces.map((piece) => ({
       id: piece.id,
       cards: piece.cards.map((card) => ({ id: card.id, place: card.place, digit: card.digit })),
@@ -183,61 +222,127 @@ export function deserializeSums(raw: unknown, pieceIds: Set<string>): Sum[] {
   return result;
 }
 
+export function serializeLesson(lesson: Lesson): StoredLesson {
+  return {
+    version: LESSON_VERSION,
+    activeBoardId: lesson.activeBoardId,
+    boards: lesson.boards.map((board) => ({
+      id: board.id,
+      name: board.name,
+      ...serializeBoard(board.pieces, board.sums),
+      ...(board.start ? { start: serializeBoard(board.start.pieces, board.start.sums) } : {}),
+    })),
+  };
+}
+
+function parseBoardState(raw: unknown): BoardState {
+  const pieces = deserializeBoard(raw);
+  return { pieces, sums: deserializeSums(raw, new Set(pieces.map((piece) => piece.id))) };
+}
+
+function parseName(value: unknown, index: number): string {
+  const name = typeof value === 'string' ? value.trim().slice(0, MAX_BOARD_NAME) : '';
+  return name || defaultBoardName(index);
+}
+
+function freshLesson(): Lesson {
+  return {
+    activeBoardId: 'board-1',
+    boards: [{ id: 'board-1', name: defaultBoardName(0), pieces: [], sums: [], start: null }],
+  };
+}
+
+/**
+ * Accepts unknown data from storage and rebuilds a lesson with at least one
+ * board. A single board saved before lessons existed becomes the first board.
+ */
+export function deserializeLesson(raw: unknown): Lesson {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return freshLesson();
+  const { boards, activeBoardId, pieces } = raw as {
+    boards?: unknown;
+    activeBoardId?: unknown;
+    pieces?: unknown;
+  };
+
+  if (!Array.isArray(boards)) {
+    if (!Array.isArray(pieces)) return freshLesson();
+    const lesson = freshLesson();
+    Object.assign(lesson.boards[0], parseBoardState(raw));
+    return lesson;
+  }
+
+  const result: LessonBoard[] = [];
+  const seen = new Set<string>();
+  for (const entry of boards) {
+    if (!entry || typeof entry !== 'object') continue;
+    const { id, name, start } = entry as Partial<StoredLessonBoard>;
+    if (typeof id !== 'string' || id.length === 0 || seen.has(id)) continue;
+    seen.add(id);
+    result.push({
+      id,
+      name: parseName(name, result.length),
+      ...parseBoardState(entry),
+      start: start && typeof start === 'object' ? parseBoardState(start) : null,
+    });
+  }
+  if (result.length === 0) return freshLesson();
+
+  const active = result.find((board) => board.id === activeBoardId) ?? result[0];
+  return { boards: result, activeBoardId: active.id };
+}
+
 function readStored(): unknown {
   if (typeof localStorage === 'undefined') return null;
-  const raw = localStorage.getItem(BOARD_KEY);
-  return raw ? JSON.parse(raw) : null;
+  const lesson = localStorage.getItem(LESSON_KEY);
+  // Once a lesson is saved the old board is never read again, so a corrupt
+  // lesson cannot bring back a stale board from before the migration.
+  if (lesson !== null) return JSON.parse(lesson);
+  const board = localStorage.getItem(BOARD_KEY);
+  return board ? JSON.parse(board) : null;
 }
 
-export function loadBoard(): Piece[] {
+export function loadLesson(): Lesson {
   try {
-    return deserializeBoard(readStored());
+    return deserializeLesson(readStored());
   } catch {
     // Corrupt or inaccessible storage behaves like a fresh workbench.
-    return [];
+    return freshLesson();
   }
 }
 
-export function loadSums(pieces: Piece[]): Sum[] {
-  try {
-    return deserializeSums(readStored(), new Set(pieces.map((piece) => piece.id)));
-  } catch {
-    return [];
-  }
-}
-
-export function saveBoard(board: StoredBoard): void {
+export function saveLesson(lesson: StoredLesson): void {
   try {
     if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(BOARD_KEY, JSON.stringify(board));
+    // The old board key is left alone, so an older copy of the app still opens.
+    localStorage.setItem(LESSON_KEY, JSON.stringify(lesson));
   } catch {
     // A nicety, like preferences; private browsing can reject storage.
   }
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingBoard: StoredBoard | null = null;
+let pendingLesson: StoredLesson | null = null;
 
-export function saveBoardLater(board: StoredBoard): void {
+export function saveLessonLater(lesson: StoredLesson): void {
   // Rapid moves coalesce into one write; drag frames never thrash storage.
-  pendingBoard = board;
+  pendingLesson = lesson;
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    const boardToWrite = pendingBoard;
-    pendingBoard = null;
-    if (boardToWrite) saveBoard(boardToWrite);
+    const lessonToWrite = pendingLesson;
+    pendingLesson = null;
+    if (lessonToWrite) saveLesson(lessonToWrite);
   }, SAVE_DELAY);
 }
 
-/** Writes any pending board immediately (used when the page goes away). */
-export function flushBoard(): void {
+/** Writes any pending lesson immediately (used when the page goes away). */
+export function flushLesson(): void {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  if (pendingBoard) {
-    saveBoard(pendingBoard);
-    pendingBoard = null;
+  if (pendingLesson) {
+    saveLesson(pendingLesson);
+    pendingLesson = null;
   }
 }

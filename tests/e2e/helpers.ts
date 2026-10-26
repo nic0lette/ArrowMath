@@ -208,10 +208,17 @@ export async function gotoSeeded(
       if (sessionStorage.getItem(flag)) return;
       sessionStorage.setItem(flag, '1');
       localStorage.setItem(
-        'arrow-math:workbench',
+        'arrow-math:lesson',
         JSON.stringify({
-          version: 1,
-          pieces: pieces.map((piece, index) => ({ mode: 'stack', z: index + 1, ...piece })),
+          version: 2,
+          activeBoardId: 'board-1',
+          boards: [
+            {
+              id: 'board-1',
+              name: 'Board 1',
+              pieces: pieces.map((piece, index) => ({ mode: 'stack', z: index + 1, ...piece })),
+            },
+          ],
         }),
       );
       if (preferences) localStorage.setItem('arrow-math:preferences', JSON.stringify(preferences));

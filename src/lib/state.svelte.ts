@@ -20,11 +20,12 @@ import { audio } from './audio';
 import { WORLD_WIDTH, edgeScrollSpeed, scrollWidth } from './scroll';
 import {
   deserializeBoard,
-  flushBoard,
-  loadBoard,
-  loadSums,
-  saveBoardLater,
-  serializeBoard,
+  flushLesson,
+  loadLesson,
+  saveLessonLater,
+  serializeLesson,
+  type Lesson,
+  type LessonBoard,
 } from './boardStorage';
 import { freezeCardMotion } from './cardMotion';
 import {
@@ -247,9 +248,13 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 class ArrowMathStore {
+  /** The pieces on the active board; its entry in `boards` is stale until saved. */
   pieces = $state<Piece[]>([]);
   /** Each "+" on the board, with the pieces attached to its two sides. */
   sums = $state<Sum[]>([]);
+  /** Every board in the lesson, in order. */
+  boards = $state<LessonBoard[]>([]);
+  activeBoardId = $state('');
   selectedSumId = $state<string | null>(null);
   /** The plus side a dragged number would attach to if dropped now. */
   sumHover = $state<SumHover | null>(null);
@@ -305,10 +310,13 @@ class ArrowMathStore {
 
     // A lesson continues after a refresh. Pieces load before any canvas is
     // measured; measureCanvas clamps them into whatever size it finds.
-    const restored = loadBoard();
-    if (restored.length > 0) {
-      this.pieces = restored;
-      this.sums = loadSums(restored);
+    const lesson = loadLesson();
+    this.boards = lesson.boards;
+    this.activeBoardId = lesson.activeBoardId;
+    const active = lesson.boards.find((board) => board.id === lesson.activeBoardId);
+    if (active && active.pieces.length > 0) {
+      this.pieces = active.pieces;
+      this.sums = active.sums;
       this.pendingBoardClamp = true;
     }
     this.watchBoard();
@@ -464,17 +472,27 @@ class ArrowMathStore {
     };
   }
 
+  /** The lesson as it stands, with the live pieces in the active board. */
+  private currentLesson(): Lesson {
+    return {
+      activeBoardId: this.activeBoardId,
+      boards: this.boards.map((board) =>
+        board.id === this.activeBoardId ? { ...board, pieces: this.pieces, sums: this.sums } : board,
+      ),
+    };
+  }
+
   /**
-   * Saves the board whenever any piece changes — a drag, snap, peel or remove.
+   * Saves the lesson whenever any piece changes — a drag, snap, peel or remove.
    * The store lives outside component initialisation, so the root effect form
-   * applies. Reading `pieces` here deep-tracks every card and coordinate, and a
+   * applies. Serializing here deep-tracks every card and coordinate, and a
    * module-level `pagehide` listener flushes the debounced write on close.
    */
   private watchBoard(): void {
     if (this.boardWatcherStop) return;
     this.boardWatcherStop = $effect.root(() => {
       $effect(() => {
-        saveBoardLater(serializeBoard(this.pieces, this.sums));
+        saveLessonLater(serializeLesson(this.currentLesson()));
       });
     });
   }
@@ -2086,5 +2104,5 @@ export function springFor(piece: Piece): { stiffness: number; damping: number } 
 
 // A tab being closed or swapped away cannot wait for the debounced write.
 if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', () => flushBoard());
+  window.addEventListener('pagehide', () => flushLesson());
 }

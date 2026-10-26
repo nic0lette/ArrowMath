@@ -652,6 +652,35 @@ test('a cleared workbench stays clear after a reload', async ({ page }) => {
   await expect(workbench(page)).toHaveAttribute('data-piece-count', '0');
 });
 
+test('a workbench saved before lessons existed opens as the first board', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('arrow-math:test-old-board')) return;
+    sessionStorage.setItem('arrow-math:test-old-board', '1');
+    localStorage.setItem(
+      'arrow-math:workbench',
+      JSON.stringify({
+        version: 1,
+        pieces: [{ id: 'old', cards: [{ id: 'c', place: 100, digit: 3 }], x: 120, y: 120, mode: 'stack', z: 1 }],
+      }),
+    );
+  });
+  await page.goto('/');
+  await expect(card(page, 100, 3)).toBeVisible();
+
+  await page.waitForTimeout(600);
+  const lesson = await page.evaluate(() => JSON.parse(localStorage.getItem('arrow-math:lesson') ?? 'null'));
+  expect(lesson.boards).toHaveLength(1);
+  expect(lesson.boards[0].name).toBe('Board 1');
+  expect(lesson.boards[0].pieces.map((piece: { id: string }) => piece.id)).toEqual(['old']);
+
+  // From now on the lesson is what loads, so a change survives a reload.
+  await page.getByRole('button', { name: 'Reset canvas' }).click();
+  await expect(workbench(page)).toHaveAttribute('data-card-count', '0');
+  await page.waitForTimeout(600);
+  await page.reload();
+  await expect(workbench(page)).toHaveAttribute('data-card-count', '0');
+});
+
 test('phone layout stays within the viewport and collapses the tray', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoApp(page);

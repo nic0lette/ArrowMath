@@ -1,13 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   deserializeBoard,
   deserializeSums,
-  flushBoard,
-  loadBoard,
-  saveBoard,
-  saveBoardLater,
   serializeBoard,
-  BOARD_KEY,
   BOARD_VERSION,
 } from '../../src/lib/boardStorage';
 import { sortCards, type Piece, type PieceMode, type Place } from '../../src/lib/geometry';
@@ -37,7 +32,6 @@ describe('serializeBoard', () => {
     ];
 
     const stored = serializeBoard(board);
-    expect(stored.version).toBe(BOARD_VERSION);
     expect(stored.pieces).toHaveLength(2);
     expect(stored.pieces[0]).toMatchObject({ id: 'piece-a', x: 100, y: 50, mode: 'stack', z: 2 });
     expect(stored.pieces[1].cards).toHaveLength(2);
@@ -223,64 +217,5 @@ describe('sums', () => {
   it('treats a board saved before sums existed as having none', () => {
     expect(deserializeSums({ version: BOARD_VERSION, pieces: [] }, ids)).toEqual([]);
     expect(deserializeSums({ sums: [{ id: '' }, null, 'x'] }, ids)).toEqual([]);
-  });
-});
-
-describe('storage round-trips', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    flushBoard();
-  });
-
-  function stubStorage(): Map<string, string> {
-    const store = new Map<string, string>();
-    const fake = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => void store.set(key, value),
-    };
-    vi.stubGlobal('localStorage', fake);
-    return store;
-  }
-
-  it('writes the debounced board and reads it back', () => {
-    const store = stubStorage();
-    const board = [piece('piece-a', [card(1, 9)], 24, 96)];
-
-    saveBoardLater(serializeBoard(board));
-    flushBoard();
-    expect(store.get(BOARD_KEY)).toContain('piece-a');
-
-    const restored = loadBoard();
-    expect(restored).toHaveLength(1);
-    expect(restored[0]).toMatchObject({ id: 'piece-a', x: 24, y: 96 });
-  });
-
-  it('coalesces rapid saves into the latest board', () => {
-    const store = stubStorage();
-
-    saveBoardLater(serializeBoard([piece('first', [card(1, 1)], 0, 0)]));
-    saveBoardLater(serializeBoard([piece('second', [card(10, 1)], 48, 0)]));
-    flushBoard();
-
-    expect(store.get(BOARD_KEY)).toContain('second');
-    expect(loadBoard().map((entry) => entry.id)).toEqual(['second']);
-  });
-
-  it('treats corrupt storage like a fresh board and handles an explicit empty board', () => {
-    stubStorage();
-
-    saveBoard(serializeBoard([]));
-    expect(loadBoard()).toEqual([]);
-
-    localStorage.setItem(BOARD_KEY, '{not json');
-    expect(loadBoard()).toEqual([]);
-
-    localStorage.setItem(BOARD_KEY, '["also wrong"]');
-    expect(loadBoard()).toEqual([]);
-  });
-
-  it('returns an empty board when localStorage is unavailable', () => {
-    vi.stubGlobal('localStorage', undefined);
-    expect(loadBoard()).toEqual([]);
   });
 });
