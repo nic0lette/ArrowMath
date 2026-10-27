@@ -283,6 +283,11 @@ class ArrowMathStore {
   canvas = $state<CanvasSize>({ width: 1200, height: 560 });
   /** The part of the bench in view, in bench coordinates. */
   view = $state<Bounds>({ x: 0, y: 0, width: 1200, height: 560 });
+  /**
+   * Whether the welcome shows on the empty bench. Only a brand-new lesson
+   * gets it; once anything happens there, every empty board stays blank.
+   */
+  showIntro = $state(false);
 
   private drag = $state<DragState | null>(null);
   private sumDrag = $state<SumDragState | null>(null);
@@ -323,6 +328,8 @@ class ArrowMathStore {
     this.boards = lesson.boards;
     this.activeBoardId = lesson.activeBoardId;
     const active = lesson.boards.find((board) => board.id === lesson.activeBoardId);
+    this.showIntro =
+      lesson.boards.length === 1 && !active?.start && !active?.pieces.length && !active?.sums.length;
     if (active && active.pieces.length > 0) {
       this.pieces = active.pieces;
       this.sums = active.sums;
@@ -516,6 +523,7 @@ class ArrowMathStore {
   }
 
   private leaveBoard(): void {
+    this.showIntro = false;
     this.cancelInteraction();
     this.clearSelection();
     this.hover = null;
@@ -620,6 +628,9 @@ class ArrowMathStore {
     this.boardWatcherStop = $effect.root(() => {
       $effect(() => {
         saveLessonLater(serializeLesson(this.currentLesson()));
+      });
+      $effect(() => {
+        if (this.pieces.length > 0 || this.sums.length > 0) this.showIntro = false;
       });
     });
   }
@@ -1945,6 +1956,12 @@ class ArrowMathStore {
 
   clearBoard(): void {
     if (this.pieces.length === 0 && this.sums.length === 0) {
+      // The welcome is the only thing left to clear away.
+      if (this.showIntro) {
+        this.showIntro = false;
+        audio.reset();
+        return;
+      }
       this.notify('The workbench is already clear.', 'info');
       audio.click();
       return;
@@ -1957,6 +1974,7 @@ class ArrowMathStore {
   /** Swaps every piece and plus on the board, keeping the old ones for Undo. */
   private replaceBoard(pieces: Piece[], sums: Sum[]): void {
     this.resetSnapshot = { pieces: clonePieces(this.pieces), sums: cloneSums(this.sums) };
+    this.showIntro = false;
     // The pieces are leaving the board, so their bounce timers should not
     // outlive them and reveal a late "settle" on a piece that no longer exists.
     for (const piece of this.pieces) this.markRemoved(piece.id);

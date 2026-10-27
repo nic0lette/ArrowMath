@@ -171,7 +171,7 @@
       <BoardTabs />
     </div>
 
-    {#if game.pieces.length === 0 && game.sums.length === 0}
+    {#if game.showIntro && game.pieces.length === 0 && game.sums.length === 0}
       <EmptyState />
     {/if}
 

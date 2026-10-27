@@ -1,10 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  addBankCard,
   beginBankDrag,
   boxCenter,
   boxOf,
   card,
   dragCardBy,
+  gotoApp,
   gotoLesson,
   selectPieceOf,
   workbench,
@@ -356,4 +358,44 @@ test('Clear board empties the board but keeps its saved start', async ({ page })
 
   await page.getByRole('button', { name: 'Reset to start' }).click();
   await expectBoard(page, 'warm-up', 1);
+});
+
+function intro(page: Page) {
+  return page.getByRole('heading', { name: /Build a number/ });
+}
+
+test('the welcome only greets a brand-new lesson; Reset leaves a truly empty board', async ({ page }) => {
+  await gotoApp(page);
+  await expect(intro(page)).toBeVisible();
+
+  await addBankCard(page, 1, 7);
+  await page.getByRole('button', { name: 'Reset canvas' }).click();
+  await expect(workbench(page)).toHaveAttribute('data-card-count', '0');
+  await expect(intro(page)).toHaveCount(0);
+});
+
+test('a new board, a cleared board and an empty board are all blank', async ({ page }) => {
+  await gotoLesson(page, lesson);
+  await expect(intro(page)).toHaveCount(0);
+
+  await chooseFromBoardMenu(page, 'Clear board');
+  await expectBoard(page, 'warm-up', 0);
+  await expect(intro(page)).toHaveCount(0);
+
+  await boardNav(page).getByRole('button', { name: 'Add board' }).click();
+  await expect(boardButton(page, 'Board 4')).toHaveAttribute('aria-current', 'true');
+  await expect(intro(page)).toHaveCount(0);
+
+  await boardButton(page, 'Empty').click();
+  await expectBoard(page, 'empty', 0);
+  await expect(intro(page)).toHaveCount(0);
+});
+
+test('Reset on a brand-new lesson clears away the welcome', async ({ page }) => {
+  await gotoApp(page);
+  await expect(intro(page)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Reset canvas' }).click();
+  await expect(intro(page)).toHaveCount(0);
+  await expect(page.getByText('already clear')).toHaveCount(0);
 });
