@@ -28,7 +28,7 @@ test.describe('phone, upright', () => {
     const bar = await boxOf(topbar(page));
     expect(bar.height).toBeLessThan(64);
 
-    await expect(page.getByRole('heading', { name: 'Arrow Math' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Arrow Cards' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reset canvas' })).toBeVisible();
     await expect(menuButton(page)).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByRole('combobox', { name: 'Color theme' })).toBeHidden();

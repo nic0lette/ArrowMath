@@ -40,6 +40,18 @@ async function probeBankOverlap(
   return label;
 }
 
+test('the app is called Arrow Cards', async ({ page }) => {
+  await gotoApp(page);
+  await expect(page).toHaveTitle(/^Arrow Cards/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Arrow Cards' })).toBeVisible();
+  await expect(page.getByRole('main', { name: 'Arrow Cards workbench' })).toBeVisible();
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /^Arrow Cards/);
+  await expect(page.getByText('Arrow Math')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'How arrow cards work' }).click();
+  await expect(page.locator('dialog.guide-dialog')).toContainText('Arrow Cards · place value made visible');
+});
+
 test('clicking a bank card adds exactly one card and selects it', async ({ page }) => {
   await gotoApp(page);
 

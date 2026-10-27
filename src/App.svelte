@@ -27,7 +27,7 @@
 
 <div class="app" data-theme={game.theme} class:interacting={game.isInteracting}>
   <Toolbar {phone} />
-  <main class="workspace" aria-label="Arrow Math workbench">
+  <main class="workspace" aria-label="Arrow Cards workbench">
     <Workbench />
     {#if phone}
       <PhoneTray side={width > height} />

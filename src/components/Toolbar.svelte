@@ -234,7 +234,7 @@
       </svg>
     </span>
     <div class="brand-text">
-      <h1>Arrow Math</h1>
+      <h1>Arrow Cards</h1>
       <p>Place value workbench</p>
     </div>
   </div>

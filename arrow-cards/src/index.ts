@@ -3,7 +3,7 @@
 
 export type ColorTheme = 'curriculum' | 'montessori' | 'pastel' | 'vibrant';
 /**
- * 10000 is only ever drawn as part of an answer (Arrow Math's sums reach
+ * 10000 is only ever drawn as part of an answer (the Arrow Cards app's sums reach
  * 19,998); apps decide which places a pupil can actually hold.
  */
 export type PlaceValue = 10000 | 1000 | 100 | 10 | 1;

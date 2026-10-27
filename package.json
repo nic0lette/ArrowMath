@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Arrow Math — a tactile place-value workbench for primary classrooms.",
+  "description": "Arrow Cards — a tactile place-value workbench for primary classrooms.",
   "scripts": {
     "dev": "vite --port 3000 --open",
     "dev:test": "vite --port 4173 --strictPort",

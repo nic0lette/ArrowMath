@@ -8,6 +8,9 @@ import { sortCards, type Card, type Piece, type PieceMode, type Place } from './
  * `arrow-math:lesson`, and reads the older single-board `arrow-math:workbench`
  * once to migrate it. Everything here is pure data with no runes, so it stays
  * unit-testable.
+ *
+ * The keys keep the app's old name, Arrow Math, on purpose: renaming them
+ * would lose every board and setting already saved on a device.
  */
 
 export const LESSON_KEY = 'arrow-math:lesson';

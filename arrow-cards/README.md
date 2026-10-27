@@ -1,6 +1,6 @@
 # Arrow Cards
 
-A tiny, dependency-free way to render the place-value arrow cards from **Arrow Math**.
+A tiny, dependency-free way to render the place-value arrow cards from the **Arrow Cards** app.
 
 The core is plain TypeScript that returns an SVG string, so it works in vanilla HTML,
 React, Svelte, Vue, server-side rendering — anything that can put SVG on a page.
@@ -9,7 +9,7 @@ React and Svelte adapters are included as optional conveniences.
 - **No runtime dependencies** in the core.
 - **No Tailwind required** — all styles are inline SVG attributes.
 - **Copy the whole `arrow-cards/` folder** into another project and you're done.
-- The Arrow Math app itself uses this folder, so the demo and the app can't drift apart.
+- The Arrow Cards app itself uses this folder, so the demo and the app can't drift apart.
 
 ---
 
@@ -211,7 +211,7 @@ The demo shows every place value, digit 1–9, all four themes, and the zero-gho
 
 ## What is *not* in the library
 
-This package only draws cards. Arrow Math's drag, grid snapping, bounce rules, card
+This package only draws cards. The app's drag, grid snapping, bounce rules, card
 grouping, and workbench state are app-specific and stay in `src/`.
 
 If you want to reuse those too, the relevant pure helpers are:

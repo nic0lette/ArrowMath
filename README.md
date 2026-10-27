@@ -1,4 +1,4 @@
-# Arrow Math
+# Arrow Cards
 
 A tactile place-value workbench for primary classrooms, built with **Svelte 5** and **Motion**.
 

@@ -203,7 +203,7 @@
     </div>
 
     <footer class="guide-foot">
-      <span>Arrow Math · place value made visible</span>
+      <span>Arrow Cards · place value made visible</span>
       <button type="button" onclick={() => game.closeGuide()}>Got it</button>
     </footer>
   </div>

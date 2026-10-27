@@ -1,5 +1,5 @@
 /**
- * All Arrow Math sounds are synthesised with the Web Audio API. There are no
+ * All Arrow Cards sounds are synthesised with the Web Audio API. There are no
  * audio files to load, so the app works completely offline.
  */
 
