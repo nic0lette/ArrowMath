@@ -75,10 +75,20 @@ test.describe('phone, upright', () => {
     await expect(tray(page).locator('[data-bank-place="1"]')).toHaveCount(0);
   });
 
-  test('all ten ones fit without scrolling', async ({ page }) => {
+  test('every place has cards 1 to 9 and no zero card', async ({ page }) => {
     await gotoApp(page);
     await openTray(page);
-    for (const digit of [0, 4, 5, 9]) await expect(trayCard(page, 1, digit)).toBeInViewport();
+    for (const [name, place] of [['Thousands', 1000], ['Hundreds', 100], ['Tens', 10], ['Ones', 1]] as const) {
+      await placeTab(page, name).click();
+      await expect(tray(page).locator(`[data-bank-place="${place}"]`)).toHaveCount(9);
+      await expect(trayCard(page, place, 0)).toHaveCount(0);
+    }
+  });
+
+  test('all nine ones fit without scrolling', async ({ page }) => {
+    await gotoApp(page);
+    await openTray(page);
+    for (const digit of [1, 5, 6, 9]) await expect(trayCard(page, 1, digit)).toBeInViewport();
   });
 
   test('a tapped card lands on the bench where the open tray does not hide it', async ({ page }) => {
@@ -115,7 +125,7 @@ test.describe('phone, upright', () => {
     const strip = tray(page).locator('.phone-strip');
     const before = await strip.evaluate((element) => element.scrollLeft);
 
-    const start = boxCenter(await boxOf(trayCard(page, 1000, 0)));
+    const start = boxCenter(await boxOf(trayCard(page, 1000, 1)));
     const swipe = await touchDrag(page, start, { x: start.x - 200, y: start.y + 6 });
     await swipe.release();
 
@@ -216,6 +226,8 @@ test.describe('tablet', () => {
     await expect(trayButton(page)).toHaveCount(0);
     for (const place of [1000, 100, 10, 1]) {
       await expect(page.locator(`[data-bank-place="${place}"][data-bank-digit="1"]`)).toBeVisible();
+      await expect(page.locator(`[data-bank-place="${place}"]`)).toHaveCount(9);
+      await expect(page.locator(`[data-bank-place="${place}"][data-bank-digit="0"]`)).toHaveCount(0);
     }
   });
 });

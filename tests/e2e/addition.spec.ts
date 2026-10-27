@@ -408,7 +408,7 @@ test.describe('addition', () => {
     await addPlus(page);
 
     const slot = await boxOf(page.locator('.sum-slot[data-slot="right"]'));
-    const bank = bankCard(page, 1, 0);
+    const bank = bankCard(page, 1, 4);
     await bank.scrollIntoViewIfNeeded();
     const from = await boxOf(bank);
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
@@ -419,6 +419,6 @@ test.describe('addition', () => {
 
     const rightId = await sum(page).getAttribute('data-right');
     expect(rightId).toBeTruthy();
-    await expect(page.locator(`.card-node[data-piece="${rightId}"]`)).toHaveAttribute('data-digit', '0');
+    await expect(page.locator(`.card-node[data-piece="${rightId}"]`)).toHaveAttribute('data-digit', '4');
   });
 });

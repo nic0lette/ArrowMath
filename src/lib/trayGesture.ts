@@ -60,9 +60,13 @@ export function lockTrayGesture(node: HTMLElement, scroll: 'x' | 'y' = 'x') {
     // A drag to the bench always travels across the tray; a scroll stays
     // roughly along it. Bias ambiguous diagonal movement towards the drag so a
     // teacher pulling a card out never loses it to a little drift.
+    // A row whose cards all fit has nothing to scroll, so any pull is a drag.
     const along = Math.abs(axis === 'x' ? dx : dy);
     const across = Math.abs(axis === 'x' ? dy : dx);
-    decided = across >= PULL_INTENT || along <= across * 1.25 ? 'drag' : 'scroll';
+    decided =
+      !canScroll(event.target as HTMLElement | null) || across >= PULL_INTENT || along <= across * 1.25
+        ? 'drag'
+        : 'scroll';
 
     if (decided === 'drag') {
       if (event.cancelable) event.preventDefault();
@@ -72,6 +76,19 @@ export function lockTrayGesture(node: HTMLElement, scroll: 'x' | 'y' = 'x') {
       game.cancelBankDrag();
       stopTracking();
     }
+  }
+
+  /** Whether the strip under the card can scroll along the tray at all. */
+  function canScroll(target: HTMLElement | null): boolean {
+    for (let element = target; element && element !== node.parentElement; element = element.parentElement) {
+      const overflow = axis === 'x'
+        ? element.scrollWidth > element.clientWidth + 1
+        : element.scrollHeight > element.clientHeight + 1;
+      const style = getComputedStyle(element);
+      const scrolls = /(auto|scroll)/.test(axis === 'x' ? style.overflowX : style.overflowY);
+      if (overflow && scrolls) return true;
+    }
+    return false;
   }
 
   function onTouchEnd() {

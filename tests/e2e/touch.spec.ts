@@ -108,8 +108,8 @@ test('a diagonal pull from every tray row still reaches the workbench', async ({
   ] as const;
 
   for (const [index, drop] of drops.entries()) {
-    // Digit 3 is the fourth card in each row (after 0), so it starts in view
-    // without the strip having to scroll first.
+    // Digit 3 starts in view without the strip having to scroll first. From
+    // the ones row the pull is fairly flat, but that row has nothing to scroll.
     const card = bankCard(page, drop.place, 3);
     await card.scrollIntoViewIfNeeded();
     const box = await card.boundingBox();

@@ -19,7 +19,7 @@
     { place: 10, title: 'Tens', short: '10s' },
     { place: 1, title: 'Ones', short: '1s' },
   ];
-  const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
   let open = $state(false);
   let place = $state<Place>(1);
@@ -337,7 +337,7 @@
   /* Upright: two rows that scroll sideways. Ones fit five by two. */
   .phone-strip {
     display: grid;
-    /* 0–4 on top, 5–9 underneath, read like a number line. */
+    /* 1–5 on top, 6–9 underneath, read like a number line. */
     grid-template-columns: repeat(5, max-content);
     justify-content: start;
     gap: 8px 8px;
