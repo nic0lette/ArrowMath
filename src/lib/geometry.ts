@@ -221,8 +221,8 @@ export function sharesPlace(a: Card[], b: Card[]): boolean {
  * that peels that one card out of its group instead of moving the whole
  * group. CardNode hover intent and the store's after-drop refresh share it.
  */
-export function isPeelZone(clientX: number, cardLeft: number): boolean {
-  return clientX - cardLeft < DIGIT_WIDTH;
+export function isPeelZone(clientX: number, cardLeft: number, zoom = 1): boolean {
+  return (clientX - cardLeft) / zoom < DIGIT_WIDTH;
 }
 
 /**

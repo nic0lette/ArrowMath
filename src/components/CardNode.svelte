@@ -63,7 +63,7 @@
     if (!grouped) return null;
     if (mode === 'expand') return 'peel';
     const target = event.currentTarget as HTMLElement;
-    return isPeelZone(event.clientX, target.getBoundingClientRect().left) ? 'peel' : 'move';
+    return isPeelZone(event.clientX, target.getBoundingClientRect().left, game.zoom) ? 'peel' : 'move';
   }
 
   function updateIntent(event: PointerEvent) {

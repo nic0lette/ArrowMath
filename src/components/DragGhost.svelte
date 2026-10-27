@@ -26,10 +26,11 @@
     class:outside={!drag.overCanvas}
     style:left="{drag.ghostX}px"
     style:top="{drag.ghostY}px"
-    style:width="{width}px"
+    style:width="{width * game.zoom}px"
     aria-hidden="true"
   >
-    <div class="ghost-card">
+    <!-- Drawn at the bench's zoom, so it lands the size it looks. -->
+    <div class="ghost-card" style:width="{width}px" style:zoom={game.zoom}>
       {#each drag.cards as card, index (card.place)}
         <span
           class="ghost-layer"

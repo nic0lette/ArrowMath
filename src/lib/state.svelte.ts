@@ -18,6 +18,8 @@ import {
 } from './addition';
 import { audio } from './audio';
 import { WORLD_WIDTH, edgeScrollSpeed, scrollWidth } from './scroll';
+import { clampZoom, defaultZoom, scrollToKeep, stepZoom } from './zoom';
+import { tick } from 'svelte';
 import {
   deserializeBoard,
   flushLesson,
@@ -157,6 +159,7 @@ interface Preferences {
   snapToGrid: boolean;
   words: boolean;
   bankOpen: boolean;
+  zoom: number;
 }
 
 const THEME_KEYS: ColorTheme[] = ['curriculum', 'montessori', 'pastel', 'vibrant'];
@@ -176,6 +179,7 @@ function readPreferences(): Partial<Preferences> {
     for (const key of ['muted', 'snapToGrid', 'words', 'bankOpen'] as const) {
       if (typeof raw[key] === 'boolean') prefs[key] = raw[key];
     }
+    if (typeof raw.zoom === 'number') prefs.zoom = clampZoom(raw.zoom);
     return prefs;
   } catch {
     return {};
@@ -273,6 +277,8 @@ class ArrowMathStore {
   /** Shows each piece's value in words under its cards. */
   showWords = $state(false);
   bankOpen = $state(true);
+  /** How large the bench is drawn: 1 is full size. Saved per device. */
+  zoom = $state(1);
   guideOpen = $state(false);
   bankDrag = $state<BankDragState | null>(null);
   hover = $state<HoverHalo | null>(null);
@@ -320,6 +326,8 @@ class ArrowMathStore {
     const roomyScreen =
       typeof window === 'undefined' || (window.innerWidth >= 760 && window.innerHeight >= 680);
     this.bankOpen = prefs.bankOpen ?? roomyScreen;
+    this.zoom =
+      prefs.zoom ?? (typeof window === 'undefined' ? 1 : defaultZoom(window.innerWidth, window.innerHeight));
     audio.setMuted(this.muted);
 
     // A lesson continues after a refresh. Pieces load before any canvas is
@@ -454,7 +462,7 @@ class ArrowMathStore {
     }
 
     const kind: DragIntentKind =
-      piece.mode === 'expand' || isPeelZone(clientX, cardElement.getBoundingClientRect().left)
+      piece.mode === 'expand' || isPeelZone(clientX, cardElement.getBoundingClientRect().left, this.zoom)
         ? 'peel'
         : 'move';
     this.intent = { pieceId, cardId, kind };
@@ -467,6 +475,7 @@ class ArrowMathStore {
       snapToGrid: this.snapToGrid,
       words: this.showWords,
       bankOpen: this.bankOpen,
+      zoom: this.zoom,
     });
   }
 
@@ -654,18 +663,23 @@ class ArrowMathStore {
     const viewRect = (scroller ?? layer ?? this.canvasEl).getBoundingClientRect();
     const viewWidth = scroller ? scroller.clientWidth : rect.width;
     this.viewRect = { left: viewRect.left, top: rect.top, width: viewWidth, height: rect.height };
-    const viewX = Math.max(0, viewRect.left - rect.left);
+    // Everything from here on is in bench units, which the zoom scales up or
+    // down on screen.
+    const zoom = this.zoom;
+    const viewX = Math.max(0, viewRect.left - rect.left) / zoom;
+    const benchViewWidth = viewWidth / zoom;
+    const benchHeight = rect.height / zoom;
     if (
       viewX !== this.view.x ||
-      viewWidth !== this.view.width ||
-      rect.height !== this.view.height
+      benchViewWidth !== this.view.width ||
+      benchHeight !== this.view.height
     ) {
-      this.view = { x: viewX, y: 0, width: viewWidth, height: rect.height };
+      this.view = { x: viewX, y: 0, width: benchViewWidth, height: benchHeight };
     }
 
     // Pieces may go anywhere across the world's width; the scroller follows.
-    const width = Math.max(WORLD_WIDTH, Math.round(viewWidth));
-    const height = Math.round(rect.height);
+    const width = Math.max(WORLD_WIDTH, Math.round(benchViewWidth));
+    const height = Math.round(benchHeight);
     if (width !== this.canvas.width || height !== this.canvas.height) {
       this.canvas = { width, height };
     }
@@ -746,8 +760,8 @@ class ArrowMathStore {
 
   private clientToCanvas(clientX: number, clientY: number): { x: number; y: number } {
     return {
-      x: clientX - this.canvasRect.left,
-      y: clientY - this.canvasRect.top,
+      x: (clientX - this.canvasRect.left) / this.zoom,
+      y: (clientY - this.canvasRect.top) / this.zoom,
     };
   }
 
@@ -811,9 +825,10 @@ class ArrowMathStore {
     this.measureCanvas();
 
     const width = copyWidth(cards);
-    const rect = this.canvasRect;
-    const ghostX = event.clientX - width / 2;
-    const ghostY = event.clientY - CARD_HEIGHT / 2;
+    // The ghost is drawn at the bench's zoom, centred on the pointer.
+    const ghostX = event.clientX - (width * this.zoom) / 2;
+    const ghostY = event.clientY - (CARD_HEIGHT * this.zoom) / 2;
+    const ghostCanvas = this.clientToCanvas(ghostX, ghostY);
 
     this.selectedSumId = null;
     this.bankDrag = {
@@ -824,8 +839,8 @@ class ArrowMathStore {
       startClientY: event.clientY,
       ghostX,
       ghostY,
-      ghostCanvasX: ghostX - rect.left,
-      ghostCanvasY: ghostY - rect.top,
+      ghostCanvasX: ghostCanvas.x,
+      ghostCanvasY: ghostCanvas.y,
       active: false,
       overCanvas: false,
     };
@@ -859,10 +874,11 @@ class ArrowMathStore {
 
     drag.active = true;
     const width = copyWidth(drag.cards);
-    drag.ghostX = clientX - width / 2;
-    drag.ghostY = clientY - CARD_HEIGHT / 2;
-    drag.ghostCanvasX = drag.ghostX - this.canvasRect.left;
-    drag.ghostCanvasY = drag.ghostY - this.canvasRect.top;
+    drag.ghostX = clientX - (width * this.zoom) / 2;
+    drag.ghostY = clientY - (CARD_HEIGHT * this.zoom) / 2;
+    const ghostCanvas = this.clientToCanvas(drag.ghostX, drag.ghostY);
+    drag.ghostCanvasX = ghostCanvas.x;
+    drag.ghostCanvasY = ghostCanvas.y;
 
     const inside = isPointInRect(clientX, clientY, this.viewRect);
     drag.overCanvas = inside;
@@ -1144,8 +1160,9 @@ class ArrowMathStore {
         freezeCardMotion(cardElement);
 
         const rect = cardElement.getBoundingClientRect();
-        const visualX = rect.left - this.canvasRect.left - cardGeometry.localX;
-        const visualY = rect.top - this.canvasRect.top - cardGeometry.localY;
+        const visual = this.clientToCanvas(rect.left, rect.top);
+        const visualX = visual.x - cardGeometry.localX;
+        const visualY = visual.y - cardGeometry.localY;
         if (Math.abs(visualX - piece.x) > 0.1 || Math.abs(visualY - piece.y) > 0.1) {
           piece.x = visualX;
           piece.y = visualY;
@@ -1193,8 +1210,9 @@ class ArrowMathStore {
     );
     if (!geometry) return;
 
-    const visualX = rect.left - this.canvasRect.left - geometry.localX;
-    const visualY = rect.top - this.canvasRect.top - geometry.localY;
+    const visual = this.clientToCanvas(rect.left, rect.top);
+    const visualX = visual.x - geometry.localX;
+    const visualY = visual.y - geometry.localY;
     if (Math.abs(visualX - piece.x) > 0.1 || Math.abs(visualY - piece.y) > 0.1) {
       piece.x = visualX;
       piece.y = visualY;
@@ -1220,8 +1238,7 @@ class ArrowMathStore {
     if (cardElement) {
       freezeCardMotion(cardElement);
       const rect = cardElement.getBoundingClientRect();
-      visualX = rect.left - this.canvasRect.left;
-      visualY = rect.top - this.canvasRect.top;
+      ({ x: visualX, y: visualY } = this.clientToCanvas(rect.left, rect.top));
     }
 
     const removal = removeCardFromPiece(source, cardId);
@@ -2128,6 +2145,40 @@ class ArrowMathStore {
     audio.setMuted(this.muted);
     this.persist();
     if (!this.muted) audio.click();
+  }
+
+  /**
+   * Draws the bench at a new size. The bench point under `anchorClientX` (a
+   * pinch's centre; the view's left edge by default) stays where it is.
+   */
+  setZoom(zoom: number, anchorClientX?: number): void {
+    const next = Math.round(clampZoom(zoom) * 100) / 100;
+    const previous = this.zoom;
+    if (next === previous) return;
+    if (this.drag || this.sumDrag || this.bankDrag) this.cancelInteraction();
+    const scroller = this.canvasEl?.querySelector<HTMLElement>('[data-workbench-scroll]');
+    const anchorX = anchorClientX === undefined ? 0 : anchorClientX - this.viewRect.left;
+    const scrollLeft = scroller
+      ? scrollToKeep({ scrollLeft: scroller.scrollLeft, anchorX, from: previous, to: next })
+      : 0;
+    this.zoom = next;
+    this.persist();
+    void tick().then(() => {
+      if (scroller) scroller.scrollLeft = Math.max(0, scrollLeft);
+      this.measureCanvas();
+    });
+  }
+
+  zoomIn(): void {
+    this.setZoom(stepZoom(this.zoom, 1));
+  }
+
+  zoomOut(): void {
+    this.setZoom(stepZoom(this.zoom, -1));
+  }
+
+  resetZoom(): void {
+    this.setZoom(1);
   }
 
   toggleBank(): void {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ColorTheme } from 'arrow-cards';
   import { game } from '../lib/state.svelte';
+  import { MAX_ZOOM, MIN_ZOOM } from '../lib/zoom';
 
   const themes: Array<{ value: ColorTheme; label: string }> = [
     { value: 'curriculum', label: 'UK Primary Curriculum' },
@@ -105,6 +106,44 @@
           </svg>
         {/if}
         <span class="tool-label">{game.muted ? 'Muted' : 'Sound'}</span>
+      </button>
+    </div>
+
+    <span class="divider" aria-hidden="true"></span>
+
+    <div class="tool-group" role="group" aria-label="Zoom">
+      <button
+        class="tool-button zoom-step"
+        type="button"
+        aria-label="Zoom out"
+        title="Make everything on the workbench smaller"
+        disabled={game.zoom <= MIN_ZOOM}
+        onclick={() => game.zoomOut()}
+      >
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+          <path d="M3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button
+        class="tool-button zoom-level"
+        type="button"
+        aria-label="Reset zoom"
+        title="Back to full size"
+        onclick={() => game.resetZoom()}
+      >
+        {Math.round(game.zoom * 100)}%
+      </button>
+      <button
+        class="tool-button zoom-step"
+        type="button"
+        aria-label="Zoom in"
+        title="Make everything on the workbench larger"
+        disabled={game.zoom >= MAX_ZOOM}
+        onclick={() => game.zoomIn()}
+      >
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+          <path d="M3.5 8h9M8 3.5v9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
       </button>
     </div>
 
@@ -324,6 +363,26 @@
     outline-offset: 1px;
   }
 
+  .tool-button:disabled {
+    opacity: 0.35;
+    cursor: default;
+    background: transparent;
+    color: var(--muted);
+  }
+
+  .zoom-step {
+    width: 28px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .zoom-level {
+    min-width: 42px;
+    padding: 0 4px;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+  }
+
   .guide-button {
     display: inline-flex;
     align-items: center;
@@ -384,7 +443,7 @@
       display: none;
     }
 
-    .tool-button {
+    .tool-button:not(.zoom-level) {
       width: 28px;
       padding: 0;
       justify-content: center;

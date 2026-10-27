@@ -113,11 +113,17 @@
   /**
    * The bench only scrolls sideways, so an ordinary up/down mouse wheel (or
    * trackpad swipe) scrolls it left and right. Sideways swipes and
-   * Shift+wheel already do; Ctrl+wheel is left alone for zooming.
+   * Shift+wheel already do; Ctrl+wheel zooms the bench.
    */
   function wheelScrollsSideways(node: HTMLElement) {
     const onWheel = (event: WheelEvent) => {
-      if (event.ctrlKey || event.shiftKey) return;
+      if (event.ctrlKey) {
+        // A trackpad pinch (and Ctrl+wheel) zooms the bench, not the page.
+        event.preventDefault();
+        game.setZoom(game.zoom * Math.exp(-event.deltaY / 200), event.clientX);
+        return;
+      }
+      if (event.shiftKey) return;
       if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       if (node.scrollWidth <= node.clientWidth) return;
       const scale =
@@ -132,6 +138,50 @@
     // Not passive: the page itself must not scroll as well.
     node.addEventListener('wheel', onWheel, { passive: false });
     return { destroy: () => node.removeEventListener('wheel', onWheel) };
+  }
+
+  /**
+   * Two fingers pinching anywhere on the bench zoom it around their centre.
+   * Touch events are used rather than pointer events because the browser
+   * keeps sending them even after the first finger started a native pan.
+   */
+  function pinchZooms(node: HTMLElement) {
+    let pinch: { distance: number; zoom: number } | null = null;
+    const spread = (touches: TouchList) =>
+      Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    const centreX = (touches: TouchList) => (touches[0].clientX + touches[1].clientX) / 2;
+
+    const onStart = (event: TouchEvent) => {
+      if (event.touches.length !== 2) return;
+      // The second finger ends whatever the first one started.
+      game.cancelInteraction();
+      pinch = { distance: Math.max(1, spread(event.touches)), zoom: game.zoom };
+    };
+    const onMove = (event: TouchEvent) => {
+      if (!pinch || event.touches.length !== 2) return;
+      if (event.cancelable) event.preventDefault();
+      game.setZoom((pinch.zoom * spread(event.touches)) / pinch.distance, centreX(event.touches));
+    };
+    const onEnd = (event: TouchEvent) => {
+      if (event.touches.length < 2) pinch = null;
+    };
+    // Stops Safari zooming the whole page instead.
+    const onGesture = (event: Event) => event.preventDefault();
+
+    node.addEventListener('touchstart', onStart, { passive: true });
+    node.addEventListener('touchmove', onMove, { passive: false });
+    node.addEventListener('touchend', onEnd);
+    node.addEventListener('touchcancel', onEnd);
+    node.addEventListener('gesturestart', onGesture);
+    return {
+      destroy: () => {
+        node.removeEventListener('touchstart', onStart);
+        node.removeEventListener('touchmove', onMove);
+        node.removeEventListener('touchend', onEnd);
+        node.removeEventListener('touchcancel', onEnd);
+        node.removeEventListener('gesturestart', onGesture);
+      },
+    };
   }
 
   let scroller: HTMLElement | undefined = $state();
@@ -151,6 +201,7 @@
   <div
     class="workbench"
     use:attachCanvas
+    use:pinchZooms
     onpointerdown={onCanvasPointerDown}
     onpointerleave={onCanvasPointerLeave}
     role="region"
@@ -160,6 +211,7 @@
     data-card-count={game.cardCount}
     data-piece-count={game.pieces.length}
     data-sum-count={game.sums.length}
+    data-zoom={game.zoom}
   >
     <div class="canvas-head">
       <div class="canvas-status" aria-hidden="true">
@@ -186,7 +238,14 @@
       onpointerup={endPan}
       onpointercancel={endPan}
     >
-    <div class="workbench-content" data-workbench-content style:width="{game.scrollWidth}px">
+    <div class="workbench-content" data-workbench-content style:width="{game.scrollWidth * game.zoom}px">
+    <!-- Draws the bench, in bench units, at the chosen zoom. -->
+    <div
+      class="zoom-layer"
+      style:width="{game.scrollWidth}px"
+      style:height="{100 / game.zoom}%"
+      style:transform="scale({game.zoom})"
+    >
     {#key game.activeBoardId}
     <!-- Remounts per board, so the new board's cards slide in rather than
          springing across from where the old board's cards were. -->
@@ -222,6 +281,7 @@
     {/if}
     </div>
     {/key}
+    </div>
     </div>
     </div>
 
@@ -273,7 +333,17 @@
     position: relative;
     min-width: 100%;
     height: 100%;
-    /* The grid scrolls with the cards, so grid snapping still lines up. */
+  }
+
+  /* Scaling makes this a stacking context, so the bench now sits under the
+     canvas head as a whole; the cards already did. */
+  .zoom-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    min-width: 100%;
+    transform-origin: 0 0;
+    /* The grid scrolls and zooms with the cards, so grid snapping still lines up. */
     background-image:
       linear-gradient(to right, var(--canvas-grid) 1px, transparent 1px),
       linear-gradient(to bottom, var(--canvas-grid) 1px, transparent 1px);
