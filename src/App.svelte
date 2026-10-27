@@ -26,7 +26,7 @@
 />
 
 <div class="app" data-theme={game.theme} class:interacting={game.isInteracting}>
-  <Toolbar />
+  <Toolbar {phone} />
   <main class="workspace" aria-label="Arrow Math workbench">
     <Workbench />
     {#if phone}

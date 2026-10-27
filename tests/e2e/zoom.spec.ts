@@ -134,6 +134,8 @@ test.describe('on a phone', () => {
 
   test('the bench starts at 75%', async ({ page }) => {
     await gotoApp(page);
+    // Phones keep the zoom buttons in the menu.
+    await page.getByRole('button', { name: 'Menu' }).click();
     await expect(zoomLabel(page)).toHaveText('75%');
   });
 });
