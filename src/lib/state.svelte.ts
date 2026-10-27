@@ -316,6 +316,8 @@ class ArrowMathStore {
   private lastCanvasHeight = 0;
   private pendingBoardClamp = false;
   private boardWatcherStop: (() => void) | null = null;
+  /** Where the phone tray lies over the bench while it is open, on screen. */
+  private trayCover: { rect: DOMRectReadOnly; side: boolean } | null = null;
 
   constructor() {
     const prefs = readPreferences();
@@ -714,6 +716,31 @@ class ArrowMathStore {
     this.settleSums();
   }
 
+  /**
+   * The phone tray reports where it covers the bench while open, and keeps
+   * that while it is away for a drag (it comes back after). Null once closed.
+   */
+  setTrayCover(cover: { rect: DOMRectReadOnly; side: boolean } | null): void {
+    this.trayCover = cover;
+  }
+
+  /**
+   * The part of the bench in view and not under the open phone tray, in bench
+   * units. New cards are placed here so they never land out of sight.
+   */
+  private get openArea(): Bounds {
+    const cover = this.trayCover;
+    if (!cover) return this.view;
+    const view = this.viewRect;
+    const zoom = this.zoom;
+    if (cover.side) {
+      const hidden = Math.max(0, view.left + view.width - cover.rect.left) / zoom;
+      return { ...this.view, width: Math.max(this.view.width * 0.4, this.view.width - hidden) };
+    }
+    const hidden = Math.max(0, view.top + view.height - cover.rect.top) / zoom;
+    return { ...this.view, height: Math.max(this.view.height * 0.4, this.view.height - hidden) };
+  }
+
   /** How wide the scrollable bench is: the view, or past the furthest piece. */
   get scrollWidth(): number {
     return scrollWidth(
@@ -926,7 +953,7 @@ class ArrowMathStore {
       pieces: this.pieces,
       obstacles: this.sumBounds(),
       canvas: this.canvas,
-      area: this.view,
+      area: this.openArea,
     });
     const piece = makePiece([incoming], spot.x, spot.y, 'stack', this.maxZ() + 1);
     this.pieces.push(piece);
@@ -1025,6 +1052,18 @@ class ArrowMathStore {
         Math.max(CANVAS_PADDING, this.canvas.height - CARD_HEIGHT - CANVAS_PADDING),
       );
     }
+
+    // The phone tray comes back after the drop; a card let go where it sits
+    // would end up hidden under it, so it lands just clear instead.
+    const area = this.openArea;
+    preview.x = Math.max(
+      CANVAS_PADDING,
+      Math.min(preview.x, area.x + area.width - width - CANVAS_PADDING),
+    );
+    preview.y = Math.max(
+      CANVAS_PADDING,
+      Math.min(preview.y, area.y + area.height - CARD_HEIGHT - CANVAS_PADDING),
+    );
 
     this.pieces.push(preview);
     this.bringToFront(preview);
@@ -1573,7 +1612,7 @@ class ArrowMathStore {
       pieces: this.pieces,
       obstacles: this.sumBounds(),
       canvas: this.canvas,
-      area: this.view,
+      area: this.openArea,
     });
     const sum: Sum = {
       id: makeId('sum'),
@@ -1928,8 +1967,9 @@ class ArrowMathStore {
     const gap = 34;
     const rowGap = 58;
     // Rows fill the part of the bench in view.
-    const left = this.view.x + pad;
-    const right = this.view.x + this.view.width - pad;
+    const area = this.openArea;
+    const left = area.x + pad;
+    const right = area.x + area.width - pad;
     let x = left;
     let y = 76;
     let rowHeight = CARD_HEIGHT;
@@ -2042,7 +2082,7 @@ class ArrowMathStore {
       pieces: this.pieces,
       obstacles: this.sumBounds(),
       canvas: this.canvas,
-      area: this.view,
+      area: this.openArea,
     });
     const piece = makePiece(cards, spot.x, spot.y, mode, this.maxZ() + 1);
     this.pieces.push(piece);
@@ -2070,7 +2110,7 @@ class ArrowMathStore {
     const cards = entries.map(({ place, digit }) => makeCard(place, digit));
     const gap = 20;
     const widths = cards.map((card) => getArrowCardWidth(card.place));
-    const availableWidth = Math.max(220, this.view.width - 80);
+    const availableWidth = Math.max(220, this.openArea.width - 80);
     const rows: Array<{ cards: Card[]; widths: number[]; width: number }> = [];
     let current: { cards: Card[]; widths: number[]; width: number } = { cards: [], widths: [], width: 0 };
 
@@ -2097,7 +2137,7 @@ class ArrowMathStore {
       pieces: this.pieces,
       obstacles: this.sumBounds(),
       canvas: this.canvas,
-      area: this.view,
+      area: this.openArea,
     });
 
     let y = spot.y;

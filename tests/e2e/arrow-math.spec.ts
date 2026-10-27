@@ -688,9 +688,10 @@ test('phone layout stays within the viewport and collapses the tray', async ({ p
   const scrollWidth = await page.evaluate(() => document.body.scrollWidth);
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   expect(scrollWidth).toBeLessThanOrEqual(viewportWidth);
-  await expect(page.getByRole('button', { name: 'Expand card tray' })).toBeVisible();
-  await page.getByRole('button', { name: 'Expand card tray' }).click();
+  await expect(page.getByRole('button', { name: 'Open card tray' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open card tray' }).click();
   await expect(page.getByRole('button', { name: 'Add Stacked' })).toBeVisible();
+  expect(await page.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(viewportWidth);
 });
 
 test('stacking onto a card at the left edge keeps the whole group on the workbench', async ({

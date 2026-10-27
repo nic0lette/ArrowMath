@@ -1,3 +1,5 @@
+import { isPhoneScreen } from './screen';
+
 /**
  * The workbench can be zoomed so the whole bench (cards, pluses, toolbars and
  * grid) is drawn smaller or larger together. Pieces keep their positions in
@@ -14,8 +16,6 @@ export const MAX_ZOOM = 1.5;
 export const ZOOM_STEP = 0.1;
 /** Phones start here, so a four-digit number fits with room to work. */
 export const PHONE_ZOOM = 0.75;
-/** A screen whose short side is below this is treated as a phone. */
-const PHONE_SHORT_SIDE = 500;
 
 function round(value: number, places = 2): number {
   const factor = 10 ** places;
@@ -35,7 +35,7 @@ export function stepZoom(zoom: number, direction: 1 | -1): number {
 }
 
 export function defaultZoom(width: number, height: number): number {
-  return Math.min(width, height) < PHONE_SHORT_SIDE ? PHONE_ZOOM : 1;
+  return isPhoneScreen(width, height) ? PHONE_ZOOM : 1;
 }
 
 /**

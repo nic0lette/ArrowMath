@@ -3,6 +3,7 @@
   import { getArrowCardWidth, THEMES } from 'arrow-cards';
   import { game } from '../lib/state.svelte';
   import { placeTier, type Place } from '../lib/geometry';
+  import { lockTrayGesture } from '../lib/trayGesture';
 
   const rows: Array<{
     place: Place;
@@ -49,98 +50,6 @@
         clearTimeout(settle);
         observer.disconnect();
         node.removeEventListener('scroll', measure);
-      },
-    };
-  }
-
-  /**
-   * Touch starts on a card are a tussle between the tray's horizontal scroll
-   * and a card drag. `touch-action: pan-x` lets the browser decide as soon as
-   * the finger moves sideways; on a diagonal pull towards the bench that
-   * cancels the drag before the ghost can follow. Lock the gesture ourselves:
-   * a level swipe pans the row, anything with a real upward pull stays a card
-   * drag, and preventing that first touchmove stops the browser from taking
-   * the gesture away mid-drag.
-   */
-  const GESTURE_SLOP = 8;
-  const VERTICAL_INTENT = 36;
-
-  function lockTrayGesture(node: HTMLDivElement) {
-    let start: { x: number; y: number } | null = null;
-    let axis: 'scroll' | 'drag' | null = null;
-
-    function stopTracking() {
-      start = null;
-      axis = null;
-    }
-
-    function onTouchStart(event: TouchEvent) {
-      stopTracking();
-      if (event.touches.length !== 1) return;
-
-      const target = event.target as HTMLElement | null;
-      if (!target?.closest('.bank-card')) return;
-
-      const touch = event.touches[0];
-      start = { x: touch.clientX, y: touch.clientY };
-    }
-
-    function onTouchMove(event: TouchEvent) {
-      if (!start || axis === 'scroll' || event.touches.length !== 1) return;
-
-      // No card is being pulled (the pointerdown was ignored, or the gesture
-      // was already handed to the tray): leave native scrolling alone.
-      if (!game.bankDrag) {
-        stopTracking();
-        return;
-      }
-
-      if (axis === 'drag') {
-        if (event.cancelable) event.preventDefault();
-        return;
-      }
-
-      const touch = event.touches[0];
-      const dx = touch.clientX - start.x;
-      const dy = touch.clientY - start.y;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < GESTURE_SLOP) return;
-
-      // A workbench drag always travels up out of the tray; a tray swipe stays
-      // roughly level. Bias ambiguous diagonal movement towards the drag so a
-      // teacher pulling a card out never loses it to a little sideways drift.
-      axis =
-        Math.abs(dy) >= VERTICAL_INTENT || Math.abs(dx) <= Math.abs(dy) * 1.25
-          ? 'drag'
-          : 'scroll';
-
-      if (axis === 'drag') {
-        if (event.cancelable) event.preventDefault();
-      } else {
-        // Let the browser pan the tray. Drop the pending card drag so a
-        // pointerup over the bench cannot add a card afterwards.
-        game.cancelBankDrag();
-        stopTracking();
-      }
-    }
-
-    function onTouchEnd() {
-      stopTracking();
-    }
-
-    node.addEventListener('touchstart', onTouchStart, { passive: true });
-    // Non-passive for the whole strip: the browser must ask this handler
-    // before it can claim a card gesture for horizontal panning.
-    node.addEventListener('touchmove', onTouchMove, { passive: false });
-    node.addEventListener('touchend', onTouchEnd, { passive: true });
-    node.addEventListener('touchcancel', onTouchEnd, { passive: true });
-
-    return {
-      destroy() {
-        stopTracking();
-        node.removeEventListener('touchstart', onTouchStart);
-        node.removeEventListener('touchmove', onTouchMove);
-        node.removeEventListener('touchend', onTouchEnd);
-        node.removeEventListener('touchcancel', onTouchEnd);
       },
     };
   }
