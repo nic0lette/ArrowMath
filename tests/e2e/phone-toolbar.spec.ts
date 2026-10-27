@@ -23,7 +23,7 @@ async function openMenu(page: Page): Promise<void> {
 test.describe('phone, upright', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
-  test('the top bar is one short row with the name, Reset and the menu', async ({ page }) => {
+  test('the top bar is one short row with the name, Words, Reset and the menu', async ({ page }) => {
     await gotoApp(page);
     const bar = await boxOf(topbar(page));
     expect(bar.height).toBeLessThan(64);
@@ -32,7 +32,12 @@ test.describe('phone, upright', () => {
     await expect(page.getByRole('button', { name: 'Reset canvas' })).toBeVisible();
     await expect(menuButton(page)).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByRole('combobox', { name: 'Color theme' })).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Number words' })).toBeHidden();
+
+    // Words gets used often, so it stays beside Reset rather than in the menu.
+    const words = page.getByRole('button', { name: 'Number words' });
+    await expect(words).toBeVisible();
+    await words.click();
+    await expect(words).toHaveAttribute('aria-pressed', 'true');
 
     // Same row: the buttons sit level with the name.
     const reset = await boxOf(page.getByRole('button', { name: 'Reset canvas' }));
@@ -41,18 +46,19 @@ test.describe('phone, upright', () => {
     expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(390);
   });
 
-  test('the menu holds every other setting, with words beside the toggles', async ({ page }) => {
+  test('the menu holds every other setting, with labels on the toggles', async ({ page }) => {
     await gotoApp(page);
     await openMenu(page);
     await expect(menuButton(page)).toHaveAttribute('aria-expanded', 'true');
 
     const panel = menu(page);
     await expect(panel.getByRole('combobox', { name: 'Color theme' })).toBeVisible();
-    for (const name of ['Grid snapping', 'Number words', 'Sound', 'Zoom out', 'Reset zoom', 'Zoom in', 'Snap all cards', 'How arrow cards work']) {
+    await expect(panel.getByRole('button', { name: 'Number words' })).toHaveCount(0);
+    for (const name of ['Grid snapping', 'Sound', 'Zoom out', 'Reset zoom', 'Zoom in', 'Snap all cards', 'How arrow cards work']) {
       await expect(panel.getByRole('button', { name })).toBeVisible();
     }
     await expect(panel.getByText('Grid snap', { exact: true })).toBeVisible();
-    await expect(panel.getByText('Words', { exact: true })).toBeVisible();
+    await expect(panel.getByText('Sound', { exact: true })).toBeVisible();
     await expect(panel.getByRole('button', { name: 'Reset zoom' })).toHaveText('75%');
 
     const box = await boxOf(panel);
@@ -64,9 +70,10 @@ test.describe('phone, upright', () => {
   test('toggles work from the menu and leave it open for the next one', async ({ page }) => {
     await gotoApp(page);
     await openMenu(page);
-    const words = menu(page).getByRole('button', { name: 'Number words' });
-    await words.click();
-    await expect(words).toHaveAttribute('aria-pressed', 'true');
+    const snap = menu(page).getByRole('button', { name: 'Grid snapping' });
+    const before = await snap.getAttribute('aria-pressed');
+    await snap.click();
+    await expect(snap).not.toHaveAttribute('aria-pressed', before!);
     await expect(menu(page)).toBeVisible();
 
     await menu(page).getByRole('button', { name: 'Zoom in' }).click();
@@ -114,7 +121,8 @@ test.describe('phone, on its side', () => {
   test('the top bar uses the menu too, and the open menu fits on screen', async ({ page }) => {
     await gotoApp(page);
     expect((await boxOf(topbar(page))).height).toBeLessThan(64);
-    await expect(page.getByRole('button', { name: 'Number words' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Number words' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Grid snapping' })).toBeHidden();
 
     await openMenu(page);
     const box = await boxOf(menu(page));

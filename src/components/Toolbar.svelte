@@ -78,21 +78,9 @@
       <span class="tool-label">Grid snap</span>
     </button>
 
-    <button
-      class="tool-button"
-      class:active={game.showWords}
-      type="button"
-      aria-pressed={game.showWords}
-      aria-label="Number words"
-      title="Show each number in words under its cards"
-      onclick={() => game.toggleWords()}
-    >
-      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-        <path d="M1.7 8S4 3.8 8 3.8 14.3 8 14.3 8 12 12.2 8 12.2 1.7 8 1.7 8Z" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>
-        <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.35"/>
-      </svg>
-      <span class="tool-label">Words</span>
-    </button>
+    {#if !phone}
+      {@render wordsButton()}
+    {/if}
 
     <button
       class="tool-button"
@@ -117,6 +105,24 @@
       <span class="tool-label">{game.muted ? 'Muted' : 'Sound'}</span>
     </button>
   </div>
+{/snippet}
+
+{#snippet wordsButton()}
+  <button
+    class="tool-button"
+    class:active={game.showWords}
+    type="button"
+    aria-pressed={game.showWords}
+    aria-label="Number words"
+    title="Show each number in words under its cards"
+    onclick={() => game.toggleWords()}
+  >
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path d="M1.7 8S4 3.8 8 3.8 14.3 8 14.3 8 12 12.2 8 12.2 1.7 8 1.7 8Z" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>
+      <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.35"/>
+    </svg>
+    <span class="tool-label">Words</span>
+  </button>
 {/snippet}
 
 {#snippet zoomControls()}
@@ -236,6 +242,7 @@
   {#if phone}
     <div class="phone-actions">
       <div class="tool-group">
+        {@render wordsButton()}
         {@render resetButton()}
       </div>
       <button
@@ -644,7 +651,8 @@
     }
   }
 
-  /* Phones: one row, with the rest in a menu that drops over the bench. */
+  /* Phones: one row (Words and Reset get used most), with the rest in a
+     menu that drops over the bench. */
   .topbar.phone {
     position: relative;
     z-index: 30;
